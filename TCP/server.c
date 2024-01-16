@@ -1,12 +1,13 @@
 #include<stdio.h>
+#include<stdlib.h>
+#include<string.h>
+#include<strings.h>
+#include<unistd.h>
+#include<time.h>
 #include<sys/types.h>
 #include<sys/socket.h>
 #include<netinet/in.h>
-#include<stdlib.h>
-#include<unistd.h>
 #include<arpa/inet.h>
-#include<strings.h>
-#include<time.h>
 
 int main()
 {
@@ -14,6 +15,7 @@ int main()
 	char cmsg[100], smsg[100];
 	struct sockaddr_in server_address,client_address;
 	socklen_t clientlen;
+	time_t t;
 	if((socket_server = socket(AF_INET, SOCK_STREAM, 0)) < 0)
 	{
 		printf("\nServer cannot open the socket.");
@@ -34,16 +36,15 @@ int main()
 		printf("\nClient is Bad.");
 		exit(1);
 	}
-	int n = read(socket_client, cmsg, 100);
+	read(socket_client, cmsg, 100);
 	printf("\nMessage received from the Client is: %s\n", cmsg);
-	time_t t;
+	sleep(2);
 	time(&t);
-	printf("\nTime: %s\n", ctime(&t));
-	printf ("\nMessage from Server to Client: ");
-	scanf("%s",smsg);
+	strcat(cmsg,ctime(&t));
+	strcpy(smsg,cmsg);
 	write(socket_client, smsg, 100);
-	time(&t);
-	printf("\nTime: %s\n", ctime(&t));
+	read(socket_client, cmsg, 100);
+	printf("\nMessage received from the Client is: %s\n", cmsg);
 	close(socket_server);
 	close(socket_client);
 	return 0;
