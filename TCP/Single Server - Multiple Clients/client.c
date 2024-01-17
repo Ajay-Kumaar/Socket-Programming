@@ -12,7 +12,9 @@
 int main (int argc, char* argv[])
 {
 	int socket_client;
-	char cmsg[100],smsg[100];
+	char cmsg[1000],smsg[1000];
+	bzero(cmsg,1000);
+	bzero(smsg,1000);
 	struct sockaddr_in server_address;
 	time_t t;
 	if(argc != 3)
@@ -33,20 +35,19 @@ int main (int argc, char* argv[])
 		printf ("\nConnection Failed.");
 		exit(1);
 	}
-	printf ("\nClient-Server connected...\n");
-	while(1)
+	printf("\nClient-Server connected...\n");
+	while(strcmp(cmsg,"exit") != 0)
 	{
 		printf ("\nMessage from Client to Server: ");
-		scanf("%[^\n]s",cmsg);
-		write(socket_client, cmsg, 100);
-		read(socket_client,smsg,100);
-		if(strcmp(smsg,"exit") == 0)
+		scanf("%s",cmsg);
+		if(strcmp(cmsg,"exit") == 0)
 		{
-			close(socket_client);
-			printf("\nDisconnected from the Server...\n");
-			exit(1);
+			printf("Disconnected from the Server...\n");
+			break;
 		}
-		printf("\nMessage received from the Server is: %s\n", smsg);
+		write(socket_client, cmsg, 1000);
+		read(socket_client,smsg,1000);
+		printf("\nMessage received from the Server is: %s\n",smsg);
 	}
 	close(socket_client);
 	return 0;
