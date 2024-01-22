@@ -36,6 +36,7 @@ int main (int argc, char* argv[])
 	char request[100] = "GET / HTTP/1.1\r\n\r\n";
 	char response[20000];
 	write(socket_client,request,100);
+	bzero(response,20000);
 	read(socket_client,response,20000);
 	printf("\nResponse from the Server: %s\n",response);
 	close(socket_client);

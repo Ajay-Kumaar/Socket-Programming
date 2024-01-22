@@ -27,6 +27,7 @@ int main (int argc, char* argv[])
 	bzero(&server_address, sizeof(server_address));
 	server_address.sin_family = AF_INET;
 	server_address.sin_port = htons(8000);
+	server_address.sin_addr.s_addr = inet_addr("127.0.0.1");
 	if((bind(socket_server,(struct sockaddr*) &server_address, sizeof(server_address))) < 0)
 	{
 		printf("\nServer Bind failed.");
