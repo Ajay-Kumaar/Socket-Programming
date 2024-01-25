@@ -8,7 +8,7 @@
 #include<netinet/in.h>
 #include<arpa/inet.h>
 
-#define LOCALHOST "127.0.0.1"
+#define LOCALHOST "10.39.17.249"
 #define PORT 8080
 #define FILE_DIR "/var/www/html"
 #define MAX_BUFFER_SIZE 1024
@@ -21,12 +21,18 @@ void handle_http_request(int socket_client, const char* request)
 {
     char method[10], resource[MAX_BUFFER_SIZE];
     sscanf(request, "%s %s", method, resource);
-    char file_path[MAX_BUFFER_SIZE];
-    snprintf(file_path, sizeof(file_path), "%s%s", FILE_DIR, resource);
+	char* temp = strstr(resource,"//");
+	if(temp != NULL)
+		temp = strstr(temp+2,"/");
+	else
+		temp = resource;
+
+    char file_path[sizeof(FILE_DIR) + MAX_BUFFER_SIZE];
+    snprintf(file_path, sizeof(file_path), "%s%s", FILE_DIR, temp);
     FILE* file = fopen(file_path, "r");
     if (file != NULL)
 	{
-        const char* response_header = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n";
+        const char* response_header = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length:1024\r\n\r\n";
         send_http_response(socket_client, response_header);
         char file_buffer[2*MAX_BUFFER_SIZE];
         size_t bytesRead;
@@ -54,7 +60,7 @@ int main (int argc, char* argv[])
 	bzero(&server_address, sizeof(server_address));
 	server_address.sin_family = AF_INET;
 	server_address.sin_port = htons(PORT);
-	server_address.sin_addr.s_addr = inet_addr(LOCALHOST);
+	server_address.sin_addr.s_addr = INADDR_ANY;
 	if((bind(socket_server,(struct sockaddr*) &server_address, sizeof(server_address))) < 0)
 	{
 		printf("Server Bind failed...\n");
@@ -80,6 +86,7 @@ int main (int argc, char* argv[])
 			printf("HTTP request read operation failed...\n");
 			exit(1);
 		}
+		printf("Request: %s\n",request);
 		handle_http_request(socket_client, request);
 		close(socket_client);
 	}

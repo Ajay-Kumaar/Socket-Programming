@@ -19,11 +19,15 @@ void send_http_response(SSL* ssl, const char* response)
 }
 void handle_http_request(SSL* ssl, const char* request)
 {
+	FILE* file;
     char method[10], resource[MAX_BUFFER_SIZE];
     sscanf(request, "%s %s", method, resource);
-    char file_path[MAX_BUFFER_SIZE];
+    char file_path[sizeof(FILE_DIR) + MAX_BUFFER_SIZE];
     snprintf(file_path, sizeof(file_path), "%s%s", FILE_DIR, resource);
-    FILE* file = fopen(file_path, "r");
+	if(strcmp(resource,"/") == 0)
+		file = fopen("/var/www/html/index.nginx-debian.html", "r");
+	else	
+    	file = fopen(file_path, "r");
     if (file != NULL)
 	{
         const char *response_header = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 1024\r\n\r\n";
@@ -76,7 +80,11 @@ void configure_context(SSL_CTX *ctx)
 void handle_client(SSL* ssl)
 {
     char request[MAX_BUFFER_SIZE];
-    SSL_read(ssl, request, sizeof(request));
+    if(SSL_read(ssl, request, sizeof(request)) <= 0)
+	{
+		handle_http_request(ssl, request);
+		return;
+	}
     printf("\nReceived HTTPS request from the client: %s\n", request);
 	handle_http_request(ssl, request);
 }
