@@ -15,47 +15,46 @@
 
 void proxy_to_server(int socket_client, char* port)
 {
-	char buffer[MAX],host_str1[MAX],serv_response[MAX];
-	int i,j,k=0,ti,socket_server;
+	char request[MAX],host_name[MAX],response[MAX];
+	int i,j,k=0,n,socket_server;
 	size_t r;
   	struct addrinfo *hserv,hints,*p;
-	memset(buffer,0,sizeof(buffer));
-	if((r = read(socket_client,buffer,MAX))>0)
+	memset(request,0,sizeof(request));
+	if((r = read(socket_client,request,MAX))>0)
 	{
 			if(r>0)
 			{
 				printf("--------Incoming Request-----------\n");
-				printf("%s\n",buffer);
+				printf("%s\n",request);
 			}
-			memset(&host_str1,'\0',strlen(host_str1));
-			int tilda =0;
-			for(i=0;i<sizeof(buffer)-2;i++)
+			memset(&host_name,'\0',strlen(host_name));
+			for(i=0;i<sizeof(request)-2;i++)
 			{
-				if(buffer[i] == '/' && buffer[i+1] == '/')
+				if(request[i] == '/' && request[i+1] == '/')
 				{
 					k=0;
 					k=i+2;
-					for(j=0;buffer[k] !='/';j++)
+					for(j=0;request[k] !='/';j++)
 					{
-						host_str1[j]=buffer[k];
+						host_name[j]=request[k];
 						k++;
 					}
-					host_str1[j]='\0';
+					host_name[j]='\0';
 					break;
 				}
 			}
-			char* portchr = strstr(host_str1,":");
+			char* portchr = strstr(host_name,":");
 			if(portchr != NULL)
 			{
 				*portchr = '\0';
 				port = portchr + 1;
 			}
-			printf("Parsed Hostname from the Client HTTP request: %s\n",host_str1);
+			printf("Parsed Server hostname: %s\n",host_name);
 			printf("Server port: %s\n", port);	
 			memset(&hints,'\0',sizeof(hints));
 			hints.ai_family = AF_UNSPEC;
 			hints.ai_socktype = SOCK_STREAM;		
-			if((ti=getaddrinfo(host_str1,port,&hints,&hserv))!= 0)
+			if((n=getaddrinfo(host_name,port,&hints,&hserv))!= 0)
 			{
 				herror("Getaddrinfo error...\n");
 				exit(-1);
@@ -67,9 +66,9 @@ void proxy_to_server(int socket_client, char* port)
 					{
 						perror("Socket creation error...\n");
 						continue;
-					}				
-					
-					if(connect(socket_server,p->ai_addr,p->ai_addrlen) < 0){
+					}
+					if(connect(socket_server,p->ai_addr,p->ai_addrlen) < 0)
+					{
 						close(socket_server);
 						perror("Connection error...\n");
 						continue;				
@@ -82,18 +81,16 @@ void proxy_to_server(int socket_client, char* port)
 				exit(-1);			
 			}
 			puts("Connected to the remote server...\n");
-			if(send(socket_server,buffer,1024,0) < 0)
+			if(send(socket_server,request,MAX,0) < 0)
 			{
 				perror("Send error...\n");
 				exit(-1);
 			}
 			puts("Request sent to the remote server..\n");
 			int byte_count = 0; 
-			memset(&serv_response,'\0',sizeof(serv_response));
-			while((byte_count = recv(socket_server,serv_response,MAX,0)) > 0){
-					send(socket_client,serv_response,byte_count,0);	
-					//printf("%s\n",serv_response);
-			}
+			memset(&response,'\0',sizeof(response));
+			while((byte_count = recv(socket_server,response,MAX,0)) > 0)
+				send(socket_client,response,byte_count,0);	
 			printf("Data completely sent to the web browser through HTTP Proxy...\n");
 			printf("-----------------------------------------------------------");
 			close(socket_server);	
@@ -116,7 +113,7 @@ int main()
 	server_address.sin_family = AF_INET;
 	server_address.sin_port = htons(PORT);
 	server_address.sin_addr.s_addr = INADDR_ANY;
-	printf("Socket created...\n");
+	printf("\nSocket created...\n");
 	if(bind(socket_server,(struct sockaddr*)&server_address,sizeof(server_address)) < 0)
 	{	
 		perror("Bind error...\n");
@@ -139,8 +136,7 @@ int main()
 			exit(-1);		
 		}
 		printf("\nClient connected...\n");
-		char arr[100] = "80";
-		proxy_to_server(socket_client, arr);
+		proxy_to_server(socket_client, "80");
 	}
 	close(socket_server);
 	return 0;

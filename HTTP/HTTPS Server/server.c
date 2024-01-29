@@ -7,7 +7,7 @@
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 
-#define PORT 4433
+#define PORT 8443
 #define CERT_FILE "server.crt"
 #define KEY_FILE "server.key"
 #define FILE_DIR "/var/www/html"
@@ -19,19 +19,26 @@ void send_http_response(SSL* ssl, const char* response)
 }
 void handle_http_request(SSL* ssl, const char* request)
 {
-	FILE* file;
+	FILE* file = NULL;
     char method[10], resource[MAX_BUFFER_SIZE];
     sscanf(request, "%s %s", method, resource);
-    char file_path[sizeof(FILE_DIR) + MAX_BUFFER_SIZE];
-    snprintf(file_path, sizeof(file_path), "%s%s", FILE_DIR, resource);
-	if(strcmp(resource,"/") == 0)
+	char* temp = strstr(resource,"//");
+	if(temp != NULL)
+		temp = strstr(temp+2,"/");
+	else
+		temp = resource;
+	if(strcmp(temp,"/") == 0)
 		file = fopen("/var/www/html/index.nginx-debian.html", "r");
-	else	
+	else
+	{
+		char file_path[sizeof(FILE_DIR) + MAX_BUFFER_SIZE];
+    	snprintf(file_path, sizeof(file_path), "%s%s", FILE_DIR, temp);
     	file = fopen(file_path, "r");
+	}
     if (file != NULL)
 	{
-        const char *response_header = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 1024\r\n\r\n";
-        send_http_response(ssl,response_header);
+        const char *response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 1024\r\n\r\n";
+        send_http_response(ssl,response);
         char file_buffer[2*MAX_BUFFER_SIZE];
         size_t bytesRead;
         while ((bytesRead = fread(file_buffer, 1, sizeof(file_buffer), file)) > 0)
@@ -40,8 +47,8 @@ void handle_http_request(SSL* ssl, const char* request)
     }
 	else
 	{
-        const char* response_header = "HTTP/1.1 404 Not Found\r\nContent-Type: text/html\r\n\r\n404 - Not Found\n";
-        send_http_response(ssl,response_header);
+        const char* response = "HTTP/1.1 404 Not Found\r\nContent-Type: text/html\r\n\r\n404 - Not Found\n";
+        send_http_response(ssl,response);
     }
 }
 void init_openssl()
