@@ -8,8 +8,8 @@
 #include <openssl/err.h>
 
 #define PORT 8443
-#define CERT_FILE "server.crt"
-#define KEY_FILE "server.key"
+#define CERT_FILE "/home/user/certs/10.39.17.249.crt"
+#define KEY_FILE "/home/user/certs/10.39.17.249.key"
 #define FILE_DIR "/var/www/html"
 #define MAX_BUFFER_SIZE 1024
 
