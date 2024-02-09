@@ -7,7 +7,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
-#define PORT 8080
+#define PORT 8000
 
 void displayBoard(char board[3][3])
 {
@@ -53,7 +53,6 @@ void playGame(int socket,int player_id)
 			printf("Not your turn, please wait for any further updates.\n");
 			recv(socket, board, sizeof(board), 0);
 		}
-		printf("Current Tic-Tac-Toe Board:\n");
 		displayBoard(board);
 		recv(socket, &gameover , sizeof(int), 0);
 		if(gameover == 1)
@@ -72,7 +71,7 @@ void playGame(int socket,int player_id)
 }
 int main()
 {
-    int client_socket,player_id = 0;;
+    int client_socket,player_id = 0;
     struct sockaddr_in server_addr;
     client_socket = socket(AF_INET, SOCK_STREAM, 0);
     if(client_socket == -1)

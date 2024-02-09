@@ -7,7 +7,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
-#define PORT 8080
+#define PORT 8000
 #define MAX_CLIENTS 2
 
 void displayBoard(char board[3][3])
@@ -125,7 +125,7 @@ int main()
 	while(1)
 	{
 		int start = 0;
-		printf("\nDo you want to start a new Game (1/0): ");
+		printf("\nPress any number to start a new game: ");
 		scanf("%d",&start);
 		if(start)
     		playGame(client_sockets);
