@@ -44,6 +44,7 @@ int main()
 	printf("Client connected to Server.\n");
     recv(client_socket, buffer, BUFFER_SIZE, 0);
     printf("%s\n\n", buffer);
+	printf("#");
 	bzero(buffer, sizeof(buffer));
 	bzero(board, sizeof(board));
     while (1)
