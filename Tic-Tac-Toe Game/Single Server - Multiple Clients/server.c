@@ -3,189 +3,179 @@
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
-#include <pthread.h>
+#include <errno.h>
 
-#define PORT 8000
-#define BUFFER_SIZE 1024
 #define MAX_CLIENTS 10
-
-int p = 0;
-
-void initialize_board(char board[3][3]);
-void print_board(char board[3][3]);
-int check_winner(char board[3][3], char symbol);
-void *handle_client(void *arg);
-int add_client(int server_socket);
+#define BOARD_SIZE 3
+#define PORT 8000
 
 typedef struct
 {
+	int id;
+	int opp_id;
     int socket;
     char symbol;
 	char board[3][3];
 }Player;
-typedef struct
-{
-    int socket;
-    pthread_t thread_id;
-}Client;
 
-char buffer[BUFFER_SIZE];
-Client clients[MAX_CLIENTS];
-pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+int client_sockets[MAX_CLIENTS];
+int active_users[MAX_CLIENTS] = {0};
 
-int main()
+void displayBoard(char board[3][3])
 {
-    int server_socket;
-	int yes = 1;
-    struct sockaddr_in server_addr;
-    if ((server_socket = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-        perror("Socket creation failed");
-        exit(EXIT_FAILURE);
-    }
-	printf("Server socket created.\n");
-	if(setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1)
+    printf("Current Tic-Tac-Toe Board:\n");
+    printf("-------------\n");
+    for (int i = 0; i < 3; i++)
 	{
-		perror("setsockopt");
-		exit(0);	
-	}
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = INADDR_ANY;
-    server_addr.sin_port = htons(PORT);
-    if (bind(server_socket, (struct sockaddr*)&server_addr, sizeof(server_addr)) == -1) {
-        perror("Socket bind failed");
-        exit(EXIT_FAILURE);
+        for (int j = 0; j < 3; j++)
+            printf("| %c ", board[i][j]);
+        printf("|\n-------------\n");
     }
-	printf("Server bind success.\n");
-    if (listen(server_socket, MAX_CLIENTS) == -1) {
-        perror("Listen failed");
-        exit(EXIT_FAILURE);
-    }
-    printf("Server listening at port %d.\n\n", PORT);
-    if (add_client(server_socket) == -1) {
-        return -1;
-    }
-    close(server_socket);
-    return 0;
 }
-void *handle_client(void *arg)
+
+int isBoardFull(char board[3][3])
 {
-	bzero(buffer, sizeof(buffer));
-    int client_index = *((int*)arg);
-    int client_socket = clients[client_index].socket;
-	//printf("%d\n",client_index);
-    Player player;
-    player.socket = client_socket;
-	//printf("%d\n",player.socket);
-    pthread_mutex_lock(&mutex);
-	p++;
-    if (p % 2 == 0)
-        player.symbol = 'O';
-    else
-        player.symbol = 'X';
-	printf("%d\n",p);
-	char move;
-    sprintf(buffer, "You are player %c\n", player.symbol);
-	printf("%s",buffer);
-    send(player.socket, buffer, strlen(buffer), 0);
-	bzero(buffer, sizeof(buffer));
-	initialize_board(player.board);
-	pthread_mutex_unlock(&mutex);
-	while(p%2 != 0);
-		while (1)
+    for (int i = 0; i < 3; i++)
+	{
+        for (int j = 0; j < 3; j++)
 		{
-			send(player.socket, player.board, sizeof(player.board), 0);
-			label:
-		    recv(player.socket, &move, 1, 0);
-		    //int m = atoi(move);
-			int m = move - '0';
-		    int row = m / 3;
-		    int col = m % 3;
-		    if (player.board[row][col] == ' ') {
-		        player.board[row][col] = player.symbol;
-				send(player.socket, "Valid move.\n", strlen("Valid move.\n"), 0);
-		    } else {
-		        send(player.socket, "Invalid move, try again\n", strlen("Invalid move, try again\n"), 0);
-		        goto label;
-		    }
-		    if (check_winner(player.board, player.symbol)) {
-		        send(player.socket, "Congratulations! You win!\n", strlen("Congratulations! You win!\n"), 0);
-		        break;
-		    }
-		    int is_tie = 1;
-		    for (int i = 0; i < 3; ++i) {
-		        for (int j = 0; j < 3; ++j) {
-		            if (player.board[i][j] == ' ') {
-		                is_tie = 0;
-		                break;
-		            }
-		        }
-		        if (!is_tie) {
-		            break;
-		        }
-		    }
-		    if (is_tie) {
-		        send(player.socket, "It's a tie!\n", strlen("It's a tie!\n"), 0);
-		        break;
-		    }
-		    send(player.socket == client_socket ? clients[client_index + 1].socket : clients[client_index - 1].socket, "game in progress...\n", strlen("game in progress...\n"), 0);
-		}
-   
-    clients[client_index].socket = -1;
-    close(player.socket);
-    return NULL;
-}
-int check_winner(char board[3][3], char symbol)
-{
-    for (int i = 0; i < 3; ++i) {
-        if ((board[i][0] == symbol && board[i][1] == symbol && board[i][2] == symbol) ||
-            (board[0][i] == symbol && board[1][i] == symbol && board[2][i] == symbol)) {
-            return 1;
+            if (board[i][j] == ' ')
+                return 0;
         }
     }
-    if ((board[0][0] == symbol && board[1][1] == symbol && board[2][2] == symbol) ||
-        (board[0][2] == symbol && board[1][1] == symbol && board[2][0] == symbol)) {
+    return 1;
+}
+
+int checkWinner(Game *game, char symbol)
+{
+    for (int i = 0; i < BOARD_SIZE; i++)
+	{
+        if ((game->board[i][0] == symbol && game->board[i][1] == symbol && game->board[i][2] == symbol) ||
+            (game->board[0][i] == symbol && game->board[1][i] == symbol && game->board[2][i] == symbol))
+            return 1;
+    }
+    if ((game->board[0][0] == symbol && game->board[1][1] == symbol && game->board[2][2] == symbol) ||
+        (game->board[0][2] == symbol && game->board[1][1] == symbol && game->board[2][0] == symbol))
+        return 1;
+    return 0;
+}
+
+int performMove(Game *game, int row, int col, char symbol)
+{
+    if (game->board[row][col] == 0)
+	{
+        game->board[row][col] = symbol;
         return 1;
     }
     return 0;
 }
-void print_board(char board[3][3])
-{
-    printf("\nCurrent board:\n");
-    for (int i = 0; i < 3; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            printf("%c ", board[i][j]);
-        }
-        printf("\n");
-    }
-    printf("\n");
-}
-void initialize_board(char board[3][3])
-{
-    for (int i = 0; i < 3; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            board[i][j] = ' ';
-        }
-    }
-}
-int add_client(int server_socket)
-{
-	
-    for (int i = 0; i < MAX_CLIENTS; ++i)
-	{
-		int client_socket;
-		struct sockaddr_in client_addr;
-		socklen_t client_addr_len = sizeof(client_addr);
-		if ((client_socket = accept(server_socket, (struct sockaddr*)&client_addr, &client_addr_len)) == -1) {
-		    perror("Accept failed");
-		}
-		printf("Client connected.\n");
 
-        if (clients[i].socket == 0) {
-            clients[i].socket = client_socket;
-			int j = i;
-            if (pthread_create(&clients[i].thread_id, NULL, handle_client, (void* )&j) != 0) {
-                clients[i].socket = -1;
-                return -1;
+int main()
+{
+    int server_socket, max_sockfd, activity, i, sd, yes = 1;
+    struct sockaddr_in server_addr;
+    fd_set readfds;
+    Game game;
+    initializeGame(&game);
+    Player players[MAX_CLIENTS];
+    int numPlayers = 0;
+    server_socket = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_socket == -1)
+	{
+        perror("Socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+	setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int));
+	printf("Server socket created.\n");
+    memset(&server_addr, '0', sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+	server_addr.sin_port = htons(PORT);
+    server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    if (bind(server_socket, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0)
+	{
+        perror("Bind failed");
+        exit(EXIT_FAILURE);
+    }
+	printf("Server bind success.\n");
+    if (listen(server_socket, MAX_CLIENTS) < 0)
+	{
+        perror("Listen failed");
+        exit(EXIT_FAILURE);
+    }
+    printf("Server is listening at port %d.\n", PORT);
+    while (1)
+	{
+        FD_ZERO(&readfds);
+        FD_SET(server_socket, &readfds);
+        max_sockfd = server_socket;
+        for (i = 0; i < MAX_CLIENTS; i++)
+		{
+            sd = client_sockets[i];
+            if (sd > 0)
+                FD_SET(sd, &readfds);
+            if (sd > max_sockfd)
+                max_sockfd = sd;
+        }
+        activity = select(max_sockfd + 1, &readfds, NULL, NULL, NULL);
+        if ((activity < 0) && (errno != EINTR))
+            perror("Select error");
+        if (FD_ISSET(server_socket, &readfds))
+		{
+            int client_socket;
+            struct sockaddr_in client_addr;
+            socklen_t client_addr_len = sizeof(client_addr);
+            client_socket = accept(server_socket, (struct sockaddr*)&client_addr, &client_addr_len);
+            if (client_socket < 0)
+			{
+                perror("Accept error");
+                exit(EXIT_FAILURE);
+            }
+            printf("New connection, socket fd is %d, ip is: %s, port: %d\n",
+                   client_socket, inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+            for (i = 0; i < MAX_CLIENTS; i++)
+			{
+                if (client_sockets[i] == 0)
+				{
+                    client_sockets[i] = client_socket;
+                    break;
+                }
+            }
+        }
+        for (i = 0; i < MAX_CLIENTS; i++)
+		{
+            sd = client_sockets[i];
+			bzero(buffer, sizeof(buffer));
+            if (FD_ISSET(sd, &readfds))
+			{
+                char buffer[1024];
+                ssize_t bytes_received = recv(sd, buffer, sizeof(buffer), 0);
+				if (bytes_received == 0)
+				{
+                   	printf("Player %d disconnected from the game.\n", i);
+                    close(sd);
+                    client_sockets[i] = 0;
+                }
+				else
+				{
+                    buffer[bytes_received] = '\0';
+                    int move, row, col;
+                    if(strcmp(buffer, "active_users") == 0)
+					{
+						
+					}
+					else if(strstr(buffer, "game_request") != NULL)
+					{
+						
+					}
+					else if(strcmp(buffer, "accept_request") == 0)
+					{
+						
+					}
+					else if(strstr(buffer, "move") == 0)
+					{						
+						
+					}
+                }
             }
         }
     }

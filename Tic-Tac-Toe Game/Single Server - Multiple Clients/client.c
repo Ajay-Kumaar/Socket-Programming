@@ -5,67 +5,79 @@
 #include <arpa/inet.h>
 
 #define PORT 8000
-#define BUFFER_SIZE 1024
+#define MAX_BUFFER_SIZE 1024
 
 char board[3][3];
 
-void print_board(char board[3][3])
+void displayBoard(char board[3][3])
 {
-    printf("\nCurrent board:\n");
-    for (int i = 0; i < 3; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            printf("%c ", board[i][j]);
-        }
-        printf("\n");
+    printf("Current Tic-Tac-Toe Board:\n");
+    printf("-------------\n");
+    for (int i = 0; i < 3; i++)
+	{
+        for (int j = 0; j < 3; j++)
+            printf("| %c ", board[i][j]);
+        printf("|\n-------------\n");
     }
-    printf("\n");
 }
 
 int main()
 {
-	char m;
     int client_socket;
+	int move;
+	int ingame = 0;
+	char buffer[MAX_BUFFER_SIZE];
+	char message[MAX_BUFFER_SIZE];
+	char turn[MAX_BUFFER_SIZE];
+	ssize_t bytes_received = 0;
     struct sockaddr_in server_addr;
-    char buffer[BUFFER_SIZE];
-	//char move[1];
-	char status[50];
-    if ((client_socket = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+    client_socket = socket(AF_INET, SOCK_STREAM, 0);
+    if (client_socket == -1) {
         perror("Socket creation failed");
         exit(EXIT_FAILURE);
     }
 	printf("Client socket created.\n");
+    memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = INADDR_ANY;
     server_addr.sin_port = htons(PORT);
-    if (connect(client_socket, (struct sockaddr*)&server_addr, sizeof(server_addr)) == -1) {
+	server_addr.sin_addr.s_addr = INADDR_ANY;
+    if (connect(client_socket, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
         perror("Connection failed");
         exit(EXIT_FAILURE);
     }
-	printf("Client connected to Server.\n");
-    recv(client_socket, buffer, BUFFER_SIZE, 0);
-    printf("%s\n\n", buffer);
-	printf("#");
-	bzero(buffer, sizeof(buffer));
-	bzero(board, sizeof(board));
+    printf("You are connected to the server.\n\n");
     while (1)
 	{
-        recv(client_socket, board, sizeof(board), 0);
-        print_board(board);
-		while(strcmp(status,"Valid move.\n") != 0)
+		if(ingame == 0)
 		{
-			bzero(status, sizeof(status));
-		    printf("Enter your move (0-8): ");
-		    scanf("%c", &m);
-		    //sprintf(move, "%c", m);
-		    send(client_socket, &m, 1, 0);
-		    recv(client_socket, status, sizeof(status), 0);
+			printf("Type -- active_users -- to get the list of active players available to play a new game\nType -- game_request \'opponent_userid\' -- to request the specified player to start a new game\nType -- accept_request -- to accept the game request from another player to start a new game\n\nYour response: ");
+			scanf("%s",buffer);
+			send(client_socket, buffer, sizeof(message), 0);
+			bzero(buffer, sizeof(buffer));
 		}
-        printf("%s\n", status);
-		recv(client_socket, buffer, sizeof(buffer), 0);
-        if (strstr(buffer, "win") || strstr(buffer, "tie"))
-            break;
-		printf("%s\n", buffer);
-		bzero(buffer, sizeof(buffer));
+		if((bytes_received = recv(client_socket, buffer, sizeof(buffer), 0)) == 0)
+		{
+			printf("You are disconnected from the game.\n");
+			break;
+		}
+		if(strcmp(buffer,"Your turn.\n") == 0)
+		{
+			ingame = 1;
+			printf("%s\n", buffer);
+			printf("Enter your move (0-8): ");
+			scanf("%d", &move);
+			send(client_socket, &move, sizeof(int), 0);
+		}
+		else if(strcmp(buffer,"Opponent\'s turn.\n") == 0)
+		{
+			ingame = 1;
+			printf("%s\n", buffer);
+			recv(client_socket, &move, sizeof(int), 0);
+		}
+		else if(strstr(buffer,"active_users") == 0)
+		{
+			printf("%s");
+		}
     }
     close(client_socket);
     return 0;

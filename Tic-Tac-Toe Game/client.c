@@ -71,7 +71,7 @@ void playGame(int socket,int player_id)
 }
 int main()
 {
-    int client_socket,player_id = 0;
+    int client_socket;
     struct sockaddr_in server_addr;
     client_socket = socket(AF_INET, SOCK_STREAM, 0);
     if(client_socket == -1)
@@ -89,10 +89,14 @@ int main()
         exit(EXIT_FAILURE);
     }
     printf("Client successfully connected to the Server\n");
-	recv(client_socket, &player_id, sizeof(int), 0);
-	printf("PlayerID: %d\n\n",player_id);
+	char buffer[1024];
+	bzero(buffer, sizeof(buffer));
+	recv(client_socket, buffer, sizeof(buffer), 0);
+	printf("%s\n\n", buffer);
 	while(1)
+	{
     	playGame(client_socket,player_id);
+	}
     close(client_socket);
     return 0;
 }
