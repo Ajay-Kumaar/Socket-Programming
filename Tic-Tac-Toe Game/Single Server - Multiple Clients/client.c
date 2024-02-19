@@ -28,7 +28,6 @@ int main()
 	int ingame = 0;
 	char buffer[MAX_BUFFER_SIZE];
 	char message[MAX_BUFFER_SIZE];
-	char turn[MAX_BUFFER_SIZE];
 	ssize_t bytes_received = 0;
     struct sockaddr_in server_addr;
     client_socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -50,11 +49,12 @@ int main()
 	{
 		if(ingame == 0)
 		{
-			printf("Type -- active_users -- to get the list of active players available to play a new game\nType -- game_request \'opponent_userid\' -- to request the specified player to start a new game\nType -- accept_request -- to accept the game request from another player to start a new game\n\nYour response: ");
+			printf("Type -- active_players -- to get the list of active players available to play a new game\nType -- game_request \'opponent_userid\' -- to request the specified player to start a new game\nType -- accept_request -- to accept the game request from another player to start a new game\n\nYour response: ");
 			scanf("%s",buffer);
-			send(client_socket, buffer, sizeof(message), 0);
-			bzero(buffer, sizeof(buffer));
+			send(client_socket, buffer, sizeof(buffer), 0);
+			//bzero(buffer, sizeof(buffer));
 		}
+		//printf("\n%s\n", buffer);
 		if((bytes_received = recv(client_socket, buffer, sizeof(buffer), 0)) == 0)
 		{
 			printf("You are disconnected from the game.\n");
@@ -74,10 +74,10 @@ int main()
 			printf("%s\n", buffer);
 			recv(client_socket, &move, sizeof(int), 0);
 		}
-		else if(strstr(buffer,"active_users") == 0)
-		{
-			printf("%s");
-		}
+		else if(strstr(buffer,"active players") != NULL)
+			printf("%s\n", buffer);
+		else if(strstr(buffer,"Game request") != NULL)
+			printf("%s", buffer);
     }
     close(client_socket);
     return 0;

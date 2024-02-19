@@ -5,9 +5,8 @@
 #include <arpa/inet.h>
 #include <errno.h>
 
-#define MAX_CLIENTS 10
-#define BOARD_SIZE 3
 #define PORT 8000
+#define MAX_CLIENTS 10
 
 typedef struct
 {
@@ -20,6 +19,7 @@ typedef struct
 
 int client_sockets[MAX_CLIENTS];
 int active_users[MAX_CLIENTS] = {0};
+int n = 0;
 
 void displayBoard(char board[3][3])
 {
@@ -46,39 +46,26 @@ int isBoardFull(char board[3][3])
     return 1;
 }
 
-int checkWinner(Game *game, char symbol)
+int checkWinner(char board[3][3], char symbol)
 {
-    for (int i = 0; i < BOARD_SIZE; i++)
+    for (int i = 0; i < 3; i++)
 	{
-        if ((game->board[i][0] == symbol && game->board[i][1] == symbol && game->board[i][2] == symbol) ||
-            (game->board[0][i] == symbol && game->board[1][i] == symbol && game->board[2][i] == symbol))
+        if ((board[i][0] == symbol && board[i][1] == symbol && board[i][2] == symbol) ||
+            (board[0][i] == symbol && board[1][i] == symbol && board[2][i] == symbol))
             return 1;
     }
-    if ((game->board[0][0] == symbol && game->board[1][1] == symbol && game->board[2][2] == symbol) ||
-        (game->board[0][2] == symbol && game->board[1][1] == symbol && game->board[2][0] == symbol))
+    if ((board[0][0] == symbol && board[1][1] == symbol && board[2][2] == symbol) ||
+        (board[0][2] == symbol && board[1][1] == symbol && board[2][0] == symbol))
         return 1;
-    return 0;
-}
-
-int performMove(Game *game, int row, int col, char symbol)
-{
-    if (game->board[row][col] == 0)
-	{
-        game->board[row][col] = symbol;
-        return 1;
-    }
     return 0;
 }
 
 int main()
 {
-    int server_socket, max_sockfd, activity, i, sd, yes = 1;
+    int server_socket, max_sockfd, activity, sd, yes = 1;
     struct sockaddr_in server_addr;
     fd_set readfds;
-    Game game;
-    initializeGame(&game);
-    Player players[MAX_CLIENTS];
-    int numPlayers = 0;
+    Player player[MAX_CLIENTS];
     server_socket = socket(AF_INET, SOCK_STREAM, 0);
     if (server_socket == -1)
 	{
@@ -108,7 +95,7 @@ int main()
         FD_ZERO(&readfds);
         FD_SET(server_socket, &readfds);
         max_sockfd = server_socket;
-        for (i = 0; i < MAX_CLIENTS; i++)
+        for (int i = 0; i < MAX_CLIENTS; i++)
 		{
             sd = client_sockets[i];
             if (sd > 0)
@@ -130,9 +117,14 @@ int main()
                 perror("Accept error");
                 exit(EXIT_FAILURE);
             }
-            printf("New connection, socket fd is %d, ip is: %s, port: %d\n",
+            printf("\n\nNew player connected. Details:\nSocket File Descriptor: %d\nIP Address: %s\nPort: %d\n\n",
                    client_socket, inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
-            for (i = 0; i < MAX_CLIENTS; i++)
+			player[n].id = n;
+			player[n].socket = client_socket;
+			active_users[n] = 1;
+			n++;
+			//printf("\n%d\n", n);
+            for (int i = 0; i < n; i++)
 			{
                 if (client_sockets[i] == 0)
 				{
@@ -141,31 +133,50 @@ int main()
                 }
             }
         }
-        for (i = 0; i < MAX_CLIENTS; i++)
+        for (int i = 0; i < n; i++)
 		{
             sd = client_sockets[i];
-			bzero(buffer, sizeof(buffer));
+			char buffer[1024];
+			char msg[1024];
             if (FD_ISSET(sd, &readfds))
 			{
-                char buffer[1024];
+				bzero(buffer, sizeof(buffer));
                 ssize_t bytes_received = recv(sd, buffer, sizeof(buffer), 0);
+				//printf("\n%ld   %s\n", bytes_received, buffer);
 				if (bytes_received == 0)
 				{
                    	printf("Player %d disconnected from the game.\n", i);
                     close(sd);
                     client_sockets[i] = 0;
+					//n--;
                 }
 				else
 				{
-                    buffer[bytes_received] = '\0';
+                    buffer[strlen(buffer)] = '\0';
                     int move, row, col;
-                    if(strcmp(buffer, "active_users") == 0)
+					bzero(msg, sizeof(msg));
+                    if(strstr(buffer, "active_players") != NULL)
 					{
-						
+						sprintf(msg, "List of active players:\n");
+						//printf("\n%d\n", n);
+						for(int j=0; j<n; j++)
+						{
+							//printf("\n%d\n", j);
+							printf("\n%s\n", msg);
+							if(active_users[j] == 1)
+								sprintf(msg, "%d\n", j);
+						}
+						//printf("\n%s\n", msg);
+						send(sd, msg, sizeof(msg), 0);
 					}
 					else if(strstr(buffer, "game_request") != NULL)
 					{
-						
+						char* ptr = strstr(buffer, " ");
+						ptr+=1;
+						player[i].opp_id = atoi(ptr);
+						send(client_sockets[player[i].id], "Request sent.\n", strlen("Request sent.\n"), 0);
+						sprintf(msg, "Game request from player %d.\n",i);
+						send(client_sockets[player[i].opp_id], msg, strlen(msg), 0);
 					}
 					else if(strcmp(buffer, "accept_request") == 0)
 					{
@@ -175,6 +186,7 @@ int main()
 					{						
 						
 					}
+					
                 }
             }
         }
