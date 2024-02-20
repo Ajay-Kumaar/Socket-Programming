@@ -47,6 +47,7 @@ int main()
     printf("You are connected to the server.\n\n");
     while (1)
 	{
+		bzero(buffer, sizeof(buffer));
 		if(ingame == 0)
 		{
 			printf("Type -- active_players -- to get the list of active players available to play a new game\nType -- game_request \'opponent_userid\' -- to request the specified player to start a new game\nType -- accept_request -- to accept the game request from another player to start a new game\n\nYour response: ");
@@ -75,7 +76,13 @@ int main()
 			recv(client_socket, &move, sizeof(int), 0);
 		}
 		else if(strstr(buffer,"active players") != NULL)
-			printf("%s\n", buffer);
+		{
+			printf("\n%s\n", buffer);
+			bzero(buffer, sizeof(buffer));
+			printf("\n%s\n", buffer);
+			//recv(client_socket, buffer, sizeof(buffer), 0);
+			//printf("\n%s\n\n", buffer);
+			}
 		else if(strstr(buffer,"Game request") != NULL)
 			printf("%s", buffer);
     }
