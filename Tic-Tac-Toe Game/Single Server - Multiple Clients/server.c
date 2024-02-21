@@ -124,7 +124,7 @@ int main()
 			active_users[n] = 1;
 			n++;
 			//printf("\n%d\n", n);
-            for (int i = 0; i < n; i++)
+            for (int i = 0; i < MAX_CLIENTS; i++)
 			{
                 if (client_sockets[i] == 0)
 				{
@@ -133,7 +133,7 @@ int main()
                 }
             }
         }
-        for (int i = 0; i < n; i++)
+        for (int i = 0; i < MAX_CLIENTS; i++)
 		{
             sd = client_sockets[i];
 			char buffer[1024];
@@ -142,7 +142,6 @@ int main()
 			{
 				bzero(buffer, sizeof(buffer));
                 ssize_t bytes_received = recv(sd, buffer, sizeof(buffer), 0);
-				//printf("\n%ld   %s\n", bytes_received, buffer);
 				if (bytes_received == 0)
 				{
                    	printf("Player %d disconnected from the game.\n", i);
@@ -152,45 +151,46 @@ int main()
                 }
 				else
 				{
-                    buffer[strlen(buffer)] = '\0';
+                    buffer[bytes_received] = '\0';
+					printf("\n%s\n", buffer);
                     int move, row, col;
 					bzero(msg, sizeof(msg));
                     if(strstr(buffer, "active_players") != NULL)
 					{
-						//sprintf(msg, "List of active players:\n");
-						//printf("\n%d\n", n);
-						char active[n];
-						bzero(active, sizeof(active));
-						int k = 0;
-						for(int j=0; j<n; j++)
+						sprintf(msg, "List of active players:\n");
+						for(int j=0; j<MAX_CLIENTS; j++)
 						{
-							//printf("\n%d\n", j);
-							if(j  == i)
+							if(j == i)
 								continue;
-							if(active_users[j] == 1){
-								//sprintf(msg, "%d\n", j);
-								//printf("\n%d\n", j);
-								active[k++] = j + '0';
+							if(active_users[j] == 1)
+							{
+								strcat(msg, "\n");
+								char ch = j + '0';
+								char* chr = &ch;
+								strcat(msg, chr);
 							}
 						}
-						printf("Hi");
-						printf("%s", active);
-						send(sd, "List of active players:\n", sizeof("List of active players:\n"), 0);
-						printf("%s", active);
-						//send(sd, active, sizeof(active), 0);
+						//printf("\n%s\n", msg);
+						send(sd, msg, sizeof(msg), 0);
 					}
 					else if(strstr(buffer, "game_request") != NULL)
 					{
 						char* ptr = strstr(buffer, " ");
 						ptr+=1;
-						int id = atoi(ptr);
-						send(client_sockets[i], "Request sent.\n", strlen("Request sent.\n"), 0);
-						sprintf(msg, "Game request from player %d.\n",i);
-						send(client_sockets[id], msg, strlen(msg), 0);
+						int opp = atoi(ptr);
+						printf("\n%d\n", opp);
+						sprintf(msg, "Game request from %d.\n",i);
+						send(client_sockets[opp], msg, strlen(msg), 0);
+						bzero(msg, sizeof(msg));
 					}
-					else if(strcmp(buffer, "accept_request") == 0)
+					else if(strstr(buffer, "accept_request") != NULL)
 					{
-						
+						char* ptr = strstr(buffer, " ");
+						ptr+=1;
+						int curr = atoi(ptr);
+						int opp =  i;
+						send(client_sockets[curr], "Your turn.\n", sizeof("Your turn.\n"), 0);
+						send(client_sockets[opp], "Opponent\'s turn.\n", sizeof("Opponent\'s turn.\n"), 0);
 					}
                 }
             }

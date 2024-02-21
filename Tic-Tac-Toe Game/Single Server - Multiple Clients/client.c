@@ -30,6 +30,7 @@ int main()
 	char message[MAX_BUFFER_SIZE];
 	ssize_t bytes_received = 0;
     struct sockaddr_in server_addr;
+	fd_set readfds;
     client_socket = socket(AF_INET, SOCK_STREAM, 0);
     if (client_socket == -1) {
         perror("Socket creation failed");
@@ -47,15 +48,21 @@ int main()
     printf("You are connected to the server.\n\n");
     while (1)
 	{
+		FD_ZERO(&readfds);
+		FD_SET(client_socket, &readfds);
+		int max_sockfd = client_socket;
+		activity = select(max_sockfd + 1, &readfds, NULL, NULL, NULL);
+        if ((activity < 0) && (errno != EINTR))
+            perror("Select error");
 		bzero(buffer, sizeof(buffer));
 		if(ingame == 0)
 		{
-			printf("Type -- active_players -- to get the list of active players available to play a new game\nType -- game_request \'opponent_userid\' -- to request the specified player to start a new game\nType -- accept_request -- to accept the game request from another player to start a new game\n\nYour response: ");
-			scanf("%s",buffer);
+			printf("\nType -- active_players -- to get the list of active players available to play a new game\nType -- game_request \'opponent_userid\' -- to request the specified player to start a new game\nType -- accept_request \'opponent_userid\'-- to accept the game request from another player to start a new game\n\nYour response: ");
+			//scanf("%[^\n]s",buffer);
+			//recv(0, buffer, sizeof(buffer), 0);
+			fgets(buffer, sizeof(buffer), stdin);
 			send(client_socket, buffer, sizeof(buffer), 0);
-			//bzero(buffer, sizeof(buffer));
 		}
-		//printf("\n%s\n", buffer);
 		if((bytes_received = recv(client_socket, buffer, sizeof(buffer), 0)) == 0)
 		{
 			printf("You are disconnected from the game.\n");
@@ -79,12 +86,19 @@ int main()
 		{
 			printf("\n%s\n", buffer);
 			bzero(buffer, sizeof(buffer));
-			printf("\n%s\n", buffer);
-			//recv(client_socket, buffer, sizeof(buffer), 0);
-			//printf("\n%s\n\n", buffer);
-			}
+		}
 		else if(strstr(buffer,"Game request") != NULL)
+		{
 			printf("%s", buffer);
+			bzero(buffer, sizeof(buffer));
+			
+		}
+		else if(strstr(buffer,"accept-request") != NULL)
+		{
+			printf("%s", buffer);
+			bzero(buffer, sizeof(buffer));
+			
+		}
     }
     close(client_socket);
     return 0;
