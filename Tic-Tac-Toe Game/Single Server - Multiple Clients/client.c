@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <errno.h>
 
 #define PORT 8000
 #define MAX_BUFFER_SIZE 1024
@@ -24,8 +25,8 @@ void displayBoard(char board[3][3])
 int main()
 {
     int client_socket;
-	int move;
-	int ingame = 0;
+	char move;
+	int ingame = 0, activity;
 	char buffer[MAX_BUFFER_SIZE];
 	char message[MAX_BUFFER_SIZE];
 	ssize_t bytes_received = 0;
@@ -46,58 +47,65 @@ int main()
         exit(EXIT_FAILURE);
     }
     printf("You are connected to the server.\n\n");
+	printf("\n\nType -- active_players -- to get the list of active players available to play a new game\nType -- game_request \'opponent_userid\' -- to request the specified player to start a new game\nType -- accept_request \'opponent_userid\'-- to accept the game request from another player to start a new game\nType \'move\' followed by a number between 0-8 to send a move\n\n");
     while (1)
 	{
 		FD_ZERO(&readfds);
 		FD_SET(client_socket, &readfds);
-		int max_sockfd = client_socket;
+		FD_SET(STDIN_FILENO, &readfds);
+		int max_sockfd = (client_socket>STDIN_FILENO)?client_socket:STDIN_FILENO;
 		activity = select(max_sockfd + 1, &readfds, NULL, NULL, NULL);
         if ((activity < 0) && (errno != EINTR))
             perror("Select error");
-		bzero(buffer, sizeof(buffer));
-		if(ingame == 0)
+		if (FD_ISSET(STDIN_FILENO, &readfds))
 		{
-			printf("\nType -- active_players -- to get the list of active players available to play a new game\nType -- game_request \'opponent_userid\' -- to request the specified player to start a new game\nType -- accept_request \'opponent_userid\'-- to accept the game request from another player to start a new game\n\nYour response: ");
-			//scanf("%[^\n]s",buffer);
-			//recv(0, buffer, sizeof(buffer), 0);
+			bzero(buffer, sizeof(buffer));
 			fgets(buffer, sizeof(buffer), stdin);
 			send(client_socket, buffer, sizeof(buffer), 0);
 		}
-		if((bytes_received = recv(client_socket, buffer, sizeof(buffer), 0)) == 0)
+		if (FD_ISSET(client_socket, &readfds))
 		{
-			printf("You are disconnected from the game.\n");
-			break;
-		}
-		if(strcmp(buffer,"Your turn.\n") == 0)
-		{
-			ingame = 1;
-			printf("%s\n", buffer);
-			printf("Enter your move (0-8): ");
-			scanf("%d", &move);
-			send(client_socket, &move, sizeof(int), 0);
-		}
-		else if(strcmp(buffer,"Opponent\'s turn.\n") == 0)
-		{
-			ingame = 1;
-			printf("%s\n", buffer);
-			recv(client_socket, &move, sizeof(int), 0);
-		}
-		else if(strstr(buffer,"active players") != NULL)
-		{
-			printf("\n%s\n", buffer);
 			bzero(buffer, sizeof(buffer));
-		}
-		else if(strstr(buffer,"Game request") != NULL)
-		{
-			printf("%s", buffer);
-			bzero(buffer, sizeof(buffer));
-			
-		}
-		else if(strstr(buffer,"accept-request") != NULL)
-		{
-			printf("%s", buffer);
-			bzero(buffer, sizeof(buffer));
-			
+			if((bytes_received = recv(client_socket, buffer, sizeof(buffer), 0)) == 0)
+			{
+				printf("You are disconnected from the game.\n");
+				break;
+			}
+			if(strcmp(buffer,"Your turn.\n") == 0)
+			{
+				//ingame = 1;
+				printf("%s\n", buffer);
+				printf("Enter your move (0-8): ");
+				//scanf("%d", &move);
+				fgets(buffer, sizeof(buffer), stdin);
+				send(client_socket, &buffer, sizeof(buffer), 0);
+				bzero(buffer, sizeof(buffer));
+			}
+			else if(strcmp(buffer,"Opponent\'s turn.\n") == 0)
+			{
+				//ingame = 1;
+				printf("%s\n", buffer);
+				recv(client_socket, &move, sizeof(int), 0);
+				printf("%s", buffer);
+				bzero(buffer, sizeof(buffer));
+			}
+			else if(strstr(buffer,"active players") != NULL)
+			{
+				printf("\n%s\n", buffer);
+				bzero(buffer, sizeof(buffer));
+			}
+			else if(strstr(buffer,"Game request") != NULL)
+			{
+				printf("%s", buffer);
+				bzero(buffer, sizeof(buffer));
+				
+			}
+			else if(strstr(buffer,"accept-request") != NULL)
+			{
+				printf("%s", buffer);
+				bzero(buffer, sizeof(buffer));
+				
+			}
 		}
     }
     close(client_socket);

@@ -123,7 +123,6 @@ int main()
 			player[n].socket = client_socket;
 			active_users[n] = 1;
 			n++;
-			//printf("\n%d\n", n);
             for (int i = 0; i < MAX_CLIENTS; i++)
 			{
                 if (client_sockets[i] == 0)
@@ -147,12 +146,12 @@ int main()
                    	printf("Player %d disconnected from the game.\n", i);
                     close(sd);
                     client_sockets[i] = 0;
-					//n--;
+					n--;
                 }
 				else
 				{
                     buffer[bytes_received] = '\0';
-					printf("\n%s\n", buffer);
+					//printf("\n%s\n", buffer);
                     int move, row, col;
 					bzero(msg, sizeof(msg));
                     if(strstr(buffer, "active_players") != NULL)
@@ -170,7 +169,6 @@ int main()
 								strcat(msg, chr);
 							}
 						}
-						//printf("\n%s\n", msg);
 						send(sd, msg, sizeof(msg), 0);
 					}
 					else if(strstr(buffer, "game_request") != NULL)
@@ -178,7 +176,7 @@ int main()
 						char* ptr = strstr(buffer, " ");
 						ptr+=1;
 						int opp = atoi(ptr);
-						printf("\n%d\n", opp);
+						//printf("\n%d\n", opp);
 						sprintf(msg, "Game request from %d.\n",i);
 						send(client_sockets[opp], msg, strlen(msg), 0);
 						bzero(msg, sizeof(msg));
@@ -189,8 +187,30 @@ int main()
 						ptr+=1;
 						int curr = atoi(ptr);
 						int opp =  i;
-						send(client_sockets[curr], "Your turn.\n", sizeof("Your turn.\n"), 0);
-						send(client_sockets[opp], "Opponent\'s turn.\n", sizeof("Opponent\'s turn.\n"), 0);
+						player[curr].symbol = 'O';
+						player[opp].symbol = 'X';
+						player[opp].opp_id = curr;
+						player[curr].opp_id = opp;
+						bzero(msg, sizeof(msg));
+						sprintf(msg, "Your symbol: ");
+						char *s = player[opp].symbol;
+						strcat(msg, s);
+						send(client_sockets[opp], msg, sizeof(msg), 0);
+						sprintf(msg, "Your symbol: ");
+						char *s = player[curr].symbol;
+						strcat(msg, s);
+						send(client_sockets[curr], msg, sizeof(msg), 0);
+						send(client_sockets[opp], "\nYour turn.\n", sizeof("Your turn.\n"), 0);
+						send(client_sockets[curr], "\nOpponent\'s turn.\n", sizeof("Opponent\'s turn.\n"), 0);
+					}
+					else if(strstr(buffer, "move") != NULL)
+					{
+						printf("\n%s\n", buffer);
+						char* ptr = strstr(buffer, " ");
+						ptr+=1;
+						int move = atoi(ptr);
+						printf("%d\n", move);
+						//send();
 					}
                 }
             }
