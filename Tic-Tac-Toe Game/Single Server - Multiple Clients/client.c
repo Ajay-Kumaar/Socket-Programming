@@ -6,13 +6,24 @@
 #include <errno.h>
 
 #define PORT 8000
-#define MAX_BUFFER_SIZE 1024
+#define MAX_BUFFER_SIZE 65536
 
+int m;
+char symbol;
 char board[3][3];
 
-void displayBoard(char board[3][3])
+void initialize_board(char board[3][3])
 {
-    printf("Current Tic-Tac-Toe Board:\n");
+	for (int i = 0; i < 3; i++)
+	{
+        for (int j = 0; j < 3; j++)
+            board[i][j] == ' ';
+    }
+}
+
+void display_board(char board[3][3])
+{
+    printf("\n\nCurrent Tic-Tac-Toe Board:\n");
     printf("-------------\n");
     for (int i = 0; i < 3; i++)
 	{
@@ -25,8 +36,7 @@ void displayBoard(char board[3][3])
 int main()
 {
     int client_socket;
-	char move;
-	int ingame = 0, activity;
+	int activity;
 	char buffer[MAX_BUFFER_SIZE];
 	char message[MAX_BUFFER_SIZE];
 	ssize_t bytes_received = 0;
@@ -61,7 +71,14 @@ int main()
 		{
 			bzero(buffer, sizeof(buffer));
 			fgets(buffer, sizeof(buffer), stdin);
+			if(strstr(buffer, "move ") != NULL)
+			{
+				char* ptr = strstr(buffer, " ");
+				ptr+=1;
+				m = atoi(ptr);		
+			}
 			send(client_socket, buffer, sizeof(buffer), 0);
+			bzero(buffer, sizeof(buffer));
 		}
 		if (FD_ISSET(client_socket, &readfds))
 		{
@@ -71,40 +88,40 @@ int main()
 				printf("You are disconnected from the game.\n");
 				break;
 			}
-			if(strcmp(buffer,"Your turn.\n") == 0)
-			{
-				//ingame = 1;
-				printf("%s\n", buffer);
-				printf("Enter your move (0-8): ");
-				//scanf("%d", &move);
-				fgets(buffer, sizeof(buffer), stdin);
-				send(client_socket, &buffer, sizeof(buffer), 0);
-				bzero(buffer, sizeof(buffer));
-			}
-			else if(strcmp(buffer,"Opponent\'s turn.\n") == 0)
-			{
-				//ingame = 1;
-				printf("%s\n", buffer);
-				recv(client_socket, &move, sizeof(int), 0);
-				printf("%s", buffer);
-				bzero(buffer, sizeof(buffer));
-			}
-			else if(strstr(buffer,"active players") != NULL)
+			if(strstr(buffer,"active players") != NULL)
 			{
 				printf("\n%s\n", buffer);
 				bzero(buffer, sizeof(buffer));
 			}
-			else if(strstr(buffer,"Game request") != NULL)
+			else if(strstr(buffer,"Game request from") != NULL)
 			{
 				printf("%s", buffer);
 				bzero(buffer, sizeof(buffer));
-				
 			}
-			else if(strstr(buffer,"accept-request") != NULL)
+			else if(strstr(buffer,"turn") != NULL)
+			{
+				if(strstr(buffer,"symbol") != NULL)
+				{
+					char* ptr = strstr(buffer, ":");
+					ptr+=2;
+					symbol = *ptr;
+					printf("\n%c\n", symbol);
+				}
+				display_board(board);
+				printf("\n$%s$\n", buffer);
+				bzero(buffer, sizeof(buffer));	
+			}
+			else if(strstr(buffer,"Valid") != NULL)
 			{
 				printf("%s", buffer);
+				board[m/3][m%3] = symbol;
+				display_board(board);
 				bzero(buffer, sizeof(buffer));
-				
+			}
+			else if(strstr(buffer,"Invalid") != NULL)
+			{
+				printf("%s. Please enter a valid move.\n\n", buffer);
+				bzero(buffer, sizeof(buffer));
 			}
 		}
     }

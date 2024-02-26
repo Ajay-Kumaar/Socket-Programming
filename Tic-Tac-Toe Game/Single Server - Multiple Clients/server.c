@@ -7,6 +7,7 @@
 
 #define PORT 8000
 #define MAX_CLIENTS 10
+#define MAX_BUFFER_SIZE 65536
 
 typedef struct
 {
@@ -17,11 +18,20 @@ typedef struct
 	char board[3][3];
 }Player;
 
-int client_sockets[MAX_CLIENTS];
+int client_sockets[MAX_CLIENTS] = {0};
 int active_users[MAX_CLIENTS] = {0};
 int n = 0;
 
-void displayBoard(char board[3][3])
+void initialize_board(char board[3][3])
+{
+	for (int i = 0; i < 3; i++)
+	{
+        for (int j = 0; j < 3; j++)
+            board[i][j] == ' ';
+    }
+}
+
+void display_board(char board[3][3])
 {
     printf("Current Tic-Tac-Toe Board:\n");
     printf("-------------\n");
@@ -33,17 +43,19 @@ void displayBoard(char board[3][3])
     }
 }
 
-int isBoardFull(char board[3][3])
+int is_valid_move(char board[3][3], int row, int col)
 {
+	if(row<0 || row>2 || col<0 || col>2)
+		return 0;
     for (int i = 0; i < 3; i++)
 	{
         for (int j = 0; j < 3; j++)
 		{
             if (board[i][j] == ' ')
-                return 0;
+                return 1;
         }
     }
-    return 1;
+    return 0;
 }
 
 int checkWinner(char board[3][3], char symbol)
@@ -117,7 +129,7 @@ int main()
                 perror("Accept error");
                 exit(EXIT_FAILURE);
             }
-            printf("\n\nNew player connected. Details:\nSocket File Descriptor: %d\nIP Address: %s\nPort: %d\n\n",
+            printf("\nNew player connected...\nDetails:\n\nSocket File Descriptor: %d\nIPv4 Address: %s\nPort no. : %d\n\n",
                    client_socket, inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
 			player[n].id = n;
 			player[n].socket = client_socket;
@@ -135,8 +147,8 @@ int main()
         for (int i = 0; i < MAX_CLIENTS; i++)
 		{
             sd = client_sockets[i];
-			char buffer[1024];
-			char msg[1024];
+			char buffer[MAX_BUFFER_SIZE];
+			char msg[MAX_BUFFER_SIZE];
             if (FD_ISSET(sd, &readfds))
 			{
 				bzero(buffer, sizeof(buffer));
@@ -151,11 +163,11 @@ int main()
 				else
 				{
                     buffer[bytes_received] = '\0';
-					//printf("\n%s\n", buffer);
-                    int move, row, col;
+                    int count;
 					bzero(msg, sizeof(msg));
                     if(strstr(buffer, "active_players") != NULL)
 					{
+						count = 0;
 						sprintf(msg, "List of active players:\n");
 						for(int j=0; j<MAX_CLIENTS; j++)
 						{
@@ -167,8 +179,12 @@ int main()
 								char ch = j + '0';
 								char* chr = &ch;
 								strcat(msg, chr);
+								count++;
 							}
 						}
+						strcat(msg, "\n");
+						if(count == 0)
+							sprintf(msg, "There are no active players to start a new game.\n");
 						send(sd, msg, sizeof(msg), 0);
 					}
 					else if(strstr(buffer, "game_request") != NULL)
@@ -176,7 +192,6 @@ int main()
 						char* ptr = strstr(buffer, " ");
 						ptr+=1;
 						int opp = atoi(ptr);
-						//printf("\n%d\n", opp);
 						sprintf(msg, "Game request from %d.\n",i);
 						send(client_sockets[opp], msg, strlen(msg), 0);
 						bzero(msg, sizeof(msg));
@@ -187,30 +202,59 @@ int main()
 						ptr+=1;
 						int curr = atoi(ptr);
 						int opp =  i;
-						player[curr].symbol = 'O';
-						player[opp].symbol = 'X';
-						player[opp].opp_id = curr;
+						player[curr].symbol = 'X';
+						player[opp].symbol = 'O';
 						player[curr].opp_id = opp;
+						player[opp].opp_id = curr;
+						active_users[curr] = 0;
+						active_users[opp] = 0;
+						/*printf("\n%c\n", player[curr].symbol);
+						printf("\n%c\n", player[opp].symbol);
+						printf("\n%d\n", player[curr].opp_id);
+						printf("\n%d\n", player[opp].opp_id);
+						printf("\n%d\n", player[curr].socket);
+						printf("\n%d\n", player[opp].socket);*/
 						bzero(msg, sizeof(msg));
-						sprintf(msg, "Your symbol: ");
-						char *s = player[opp].symbol;
-						strcat(msg, s);
-						send(client_sockets[opp], msg, sizeof(msg), 0);
-						sprintf(msg, "Your symbol: ");
-						char *s = player[curr].symbol;
-						strcat(msg, s);
-						send(client_sockets[curr], msg, sizeof(msg), 0);
-						send(client_sockets[opp], "\nYour turn.\n", sizeof("Your turn.\n"), 0);
-						send(client_sockets[curr], "\nOpponent\'s turn.\n", sizeof("Opponent\'s turn.\n"), 0);
+						sprintf(msg, "Game request accepted.\n");
+						strcat(msg, "\nYour symbol: ");
+						char* s1 = &player[curr].symbol;
+						strcat(msg, s1);
+						strcat(msg, "\nYour turn. Enter your move: ");
+						printf("\n%s\n", msg);
+						send(player[curr].socket, msg, sizeof(msg), 0);
+						bzero(msg, sizeof(msg));
+						sprintf(msg, "\nYour symbol: ");
+						char* s2 = &player[opp].symbol;
+						strcat(msg, s2);
+						strcat(msg, "\nOpponent\'s turn.\n\n");
+						send(player[opp].socket, msg, sizeof(msg), 0);
+						initialize_board(player[curr].board);
+						initialize_board(player[opp].board);
 					}
 					else if(strstr(buffer, "move") != NULL)
 					{
-						printf("\n%s\n", buffer);
+						printf("\n%s", buffer);
 						char* ptr = strstr(buffer, " ");
 						ptr+=1;
 						int move = atoi(ptr);
-						printf("%d\n", move);
-						//send();
+						int row = move/3;
+						int col = move%3;
+						printf("%d %d %d", move, row, col);
+						if(is_valid_move(player[i].board, row, col))
+						{
+							player[i].board[row][col] = player[i].symbol;
+							send(player[i].socket, "Valid move.\n", sizeof("Valid move.\n"), 0);
+						    sprintf(msg, "\nIt\'s your opponent\'s turn.\n");
+							send(player[i].socket, msg, sizeof(msg), 0);
+							bzero(msg, sizeof(msg));
+							sprintf(msg, "\nNow it\'s your turn. Enter your move: ");
+							send(player[player[i].opp_id].socket, msg, sizeof(msg), 0);
+							bzero(msg, sizeof(msg));
+						}
+						else
+						{
+							send(player[i].socket, "Invalid move.\n", sizeof("Invalid move.\n"), 0);
+						}
 					}
                 }
             }
