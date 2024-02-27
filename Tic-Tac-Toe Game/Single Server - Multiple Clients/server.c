@@ -6,7 +6,7 @@
 #include <errno.h>
 
 #define PORT 8000
-#define MAX_CLIENTS 10
+#define MAX_CLIENTS 20
 #define MAX_BUFFER_SIZE 65536
 
 typedef struct
@@ -27,38 +27,33 @@ void initialize_board(char board[3][3])
 	for (int i = 0; i < 3; i++)
 	{
         for (int j = 0; j < 3; j++)
-            board[i][j] == ' ';
+            board[i][j] = ' ';
     }
 }
 
 void display_board(char board[3][3])
 {
-    printf("Current Tic-Tac-Toe Board:\n");
-    printf("-------------\n");
-    for (int i = 0; i < 3; i++)
-	{
-        for (int j = 0; j < 3; j++)
-            printf("| %c ", board[i][j]);
-        printf("|\n-------------\n");
-    }
-}
-
-int is_valid_move(char board[3][3], int row, int col)
-{
-	if(row<0 || row>2 || col<0 || col>2)
-		return 0;
+	printf("\nCurrent Tic-Tac-Toe board:\n\n");
+	printf("-----------\n");
     for (int i = 0; i < 3; i++)
 	{
         for (int j = 0; j < 3; j++)
 		{
-            if (board[i][j] == ' ')
-                return 1;
+            printf(" %c ", board[i][j]);
+            if (j < 2)
+			{
+				printf("|");
+			}
         }
+        printf("\n");
+        if (i < 2)
+			printf("-----------\n");
     }
-    return 0;
+	printf("-----------\n");
+    printf("\n");
 }
 
-int checkWinner(char board[3][3], char symbol)
+int is_game_over(char board[3][3], char symbol)
 {
     for (int i = 0; i < 3; i++)
 	{
@@ -72,12 +67,34 @@ int checkWinner(char board[3][3], char symbol)
     return 0;
 }
 
+int is_draw(char board[3][3])
+{
+	for(int i = 0; i < 3; i++)
+	{
+		for(int j = 0; j < 3; j++)
+			if(board[i][j] == ' ')
+				return 0;
+	}
+	return 1;
+}
+
+int is_valid_move(char board[3][3], int row, int col)
+{
+	if (row<0 || row>2 || col<0 || col>2)
+		return 0;
+    else if (board[row][col] == ' ')
+    	return 1;
+    return 0;
+}
+
 int main()
 {
-    int server_socket, max_sockfd, activity, sd, yes = 1;
+    int server_socket, max_sockfd, activity, sd, yes = 1, move, row, col;
     struct sockaddr_in server_addr;
     fd_set readfds;
     Player player[MAX_CLIENTS];
+	char buffer[MAX_BUFFER_SIZE];
+	char msg[MAX_BUFFER_SIZE];
     server_socket = socket(AF_INET, SOCK_STREAM, 0);
     if (server_socket == -1)
 	{
@@ -129,8 +146,7 @@ int main()
                 perror("Accept error");
                 exit(EXIT_FAILURE);
             }
-            printf("\nNew player connected...\nDetails:\n\nSocket File Descriptor: %d\nIPv4 Address: %s\nPort no. : %d\n\n",
-                   client_socket, inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+            printf("\nPlayer %d connected...\n\nDetails of Player %d:\n\n -->Socket File Descriptor: %d\n -->IPv4 Address: %s\n -->Port number: %d\n\n", n, n, client_socket, inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
 			player[n].id = n;
 			player[n].socket = client_socket;
 			active_users[n] = 1;
@@ -147,15 +163,13 @@ int main()
         for (int i = 0; i < MAX_CLIENTS; i++)
 		{
             sd = client_sockets[i];
-			char buffer[MAX_BUFFER_SIZE];
-			char msg[MAX_BUFFER_SIZE];
             if (FD_ISSET(sd, &readfds))
 			{
 				bzero(buffer, sizeof(buffer));
                 ssize_t bytes_received = recv(sd, buffer, sizeof(buffer), 0);
 				if (bytes_received == 0)
 				{
-                   	printf("Player %d disconnected from the game.\n", i);
+                   	printf("\nPlayer %d disconnected from the game...\n", i);
                     close(sd);
                     client_sockets[i] = 0;
 					n--;
@@ -165,15 +179,15 @@ int main()
                     buffer[bytes_received] = '\0';
                     int count;
 					bzero(msg, sizeof(msg));
-                    if(strstr(buffer, "active_players") != NULL)
+                    if (strstr(buffer, "active_players") != NULL)
 					{
 						count = 0;
 						sprintf(msg, "List of active players:\n");
-						for(int j=0; j<MAX_CLIENTS; j++)
+						for (int j=0; j<MAX_CLIENTS; j++)
 						{
-							if(j == i)
+							if (j == i)
 								continue;
-							if(active_users[j] == 1)
+							if (active_users[j] == 1)
 							{
 								strcat(msg, "\n");
 								char ch = j + '0';
@@ -183,20 +197,21 @@ int main()
 							}
 						}
 						strcat(msg, "\n");
-						if(count == 0)
+						if (count == 0)
 							sprintf(msg, "There are no active players to start a new game.\n");
 						send(sd, msg, sizeof(msg), 0);
 					}
-					else if(strstr(buffer, "game_request") != NULL)
+					else if (strstr(buffer, "game_request") != NULL)
 					{
 						char* ptr = strstr(buffer, " ");
 						ptr+=1;
 						int opp = atoi(ptr);
-						sprintf(msg, "Game request from %d.\n",i);
+						bzero(msg, sizeof(msg));
+						sprintf(msg, "Game request from playerID %d.\n",i);
 						send(client_sockets[opp], msg, strlen(msg), 0);
 						bzero(msg, sizeof(msg));
 					}
-					else if(strstr(buffer, "accept_request") != NULL)
+					else if (strstr(buffer, "accept_request") != NULL)
 					{
 						char* ptr = strstr(buffer, " ");
 						ptr+=1;
@@ -208,48 +223,68 @@ int main()
 						player[opp].opp_id = curr;
 						active_users[curr] = 0;
 						active_users[opp] = 0;
-						/*printf("\n%c\n", player[curr].symbol);
-						printf("\n%c\n", player[opp].symbol);
-						printf("\n%d\n", player[curr].opp_id);
-						printf("\n%d\n", player[opp].opp_id);
-						printf("\n%d\n", player[curr].socket);
-						printf("\n%d\n", player[opp].socket);*/
 						bzero(msg, sizeof(msg));
-						sprintf(msg, "Game request accepted.\n");
-						strcat(msg, "\nYour symbol: ");
+						sprintf(msg, "\nGame request accepted.\n");
+						strcat(msg, "Your symbol: ");
 						char* s1 = &player[curr].symbol;
 						strcat(msg, s1);
-						strcat(msg, "\nYour turn. Enter your move: ");
-						printf("\n%s\n", msg);
+						strcat(msg, "\nYour turn.");
 						send(player[curr].socket, msg, sizeof(msg), 0);
 						bzero(msg, sizeof(msg));
 						sprintf(msg, "\nYour symbol: ");
 						char* s2 = &player[opp].symbol;
 						strcat(msg, s2);
-						strcat(msg, "\nOpponent\'s turn.\n\n");
+						strcat(msg, "\nOpponent\'s turn. Please wait for some time...\n\n");
 						send(player[opp].socket, msg, sizeof(msg), 0);
 						initialize_board(player[curr].board);
 						initialize_board(player[opp].board);
+						bzero(msg, sizeof(msg));
 					}
-					else if(strstr(buffer, "move") != NULL)
+					else if (strstr(buffer, "move ") != NULL)
 					{
-						printf("\n%s", buffer);
 						char* ptr = strstr(buffer, " ");
 						ptr+=1;
-						int move = atoi(ptr);
-						int row = move/3;
-						int col = move%3;
-						printf("%d %d %d", move, row, col);
-						if(is_valid_move(player[i].board, row, col))
+						move = atoi(ptr);
+						row = move/3;
+						col = move%3;
+						if (is_valid_move(player[i].board, row, col))
 						{
 							player[i].board[row][col] = player[i].symbol;
-							send(player[i].socket, "Valid move.\n", sizeof("Valid move.\n"), 0);
-						    sprintf(msg, "\nIt\'s your opponent\'s turn.\n");
-							send(player[i].socket, msg, sizeof(msg), 0);
-							bzero(msg, sizeof(msg));
-							sprintf(msg, "\nNow it\'s your turn. Enter your move: ");
-							send(player[player[i].opp_id].socket, msg, sizeof(msg), 0);
-							bzero(msg, sizeof(msg));
+							player[player[i].opp_id].board[row][col] = player[i].symbol;
+							if (is_game_over(player[i].board, player[i].symbol))
+							{
+								bzero(msg, sizeof(msg));
+								sprintf(msg, "winning_move %d %c", move, player[i].symbol);
+								send(player[i].socket, msg, sizeof(msg), 0);
+								send(player[player[i].opp_id].socket, msg, sizeof(msg), 0);
+
+								bzero(msg, sizeof(msg));
+								sprintf(msg, "\n\nCongrats %c! You have won the match.\n\n", player[i].symbol);
+								send(player[i].socket, msg, sizeof(msg), 0);
+								bzero(msg, sizeof(msg));
+								sprintf(msg, "\n\nSorry %c, you have lost the match. Better luck next time!\n\n", player[player[i].opp_id].symbol);
+								send(player[player[i].opp_id].socket, msg, sizeof(msg), 0);
+								bzero(msg, sizeof(msg));
+							}
+							else if (is_draw(player[i].board))
+							{
+								bzero(msg, sizeof(msg));
+								sprintf(msg, "draw_move %d %c", move, player[i].symbol);
+								send(player[i].socket, msg, sizeof(msg), 0);
+								send(player[player[i].opp_id].socket, msg, sizeof(msg), 0);
+	
+								send(player[i].socket, "\n\nGame has ended in draw.\n\n", sizeof("\n\nGame has ended in draw.\n\n"), 0);
+								send(player[player[i].opp_id].socket, "\n\nGame has ended in draw.\n\n", sizeof("\n\nGame has ended in draw.\n\n"), 0);
+								bzero(msg, sizeof(msg));
+							}
+							else
+							{			
+								send(player[i].socket, "Valid move. It\'s your opponent\'s turn.\n", sizeof("Valid move.It\'s your opponent\'s turn.\n"), 0);
+								bzero(msg, sizeof(msg));
+								sprintf(msg, "\nOpponent\'s move was: %d. Now it\'s your turn.", move);
+								send(player[player[i].opp_id].socket, msg, sizeof(msg), 0);
+								bzero(msg, sizeof(msg));
+							}
 						}
 						else
 						{
@@ -260,5 +295,6 @@ int main()
             }
         }
     }
+	close(server_socket);
     return 0;
 }
