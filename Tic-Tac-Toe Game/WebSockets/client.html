@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tic-Tac-Toe Game</title>
+    <style>
+		body {
+			background: lightblue;
+			text-align: center;
+		}
+        table {
+            border-collapse: collapse;
+			margin-left: auto;
+			margin-right: auto;
+			width: 10%;
+        }
+        td {
+			cursor: pointer;
+            width: 50px;
+            height: 50px;
+			text-align: center;
+			font-size: 25px;
+            border: 2px dotted black;
+        }
+    </style>
+</head>
+<body>
+	<h1><u>Welcome to Tic-Tac-Toe Game</u></h1>
+	<br>
+    <h2>Your board:</h2>
+	<br>
+    <table id="board">
+        <tr>
+            <td onclick = "move(0,0)"></td>
+            <td onclick = "move(0,1)"></td>
+            <td onclick = "move(0,2)"></td>
+        </tr>
+        <tr>
+            <td onclick = "move(1,0)"></td>
+            <td onclick = "move(1,1)"></td>
+            <td onclick = "move(1,2)"></td>
+        </tr>
+        <tr>
+            <td onclick = "move(2,0)"></td>
+            <td onclick = "move(2,1)"></td>
+            <td onclick = "move(2,2)"></td>
+        </tr>
+    </table>
+    <script>
+        const webSocket = new WebSocket("ws://localhost:8000");
+        webSocket.onopen = function(event) {
+            console.log("Player successfully connected to the Tic-Tac-Toe Server.");
+        };
+        webSocket.onmessage = function(event) {
+			console.log("\nReceived message from the Server: ", event.data);
+			if (event.data.includes(","))
+			{
+				let [row, cell, symbol] = event.data.split(",");
+				document.getElementById("board").rows[row].cells[cell].innerText = symbol;
+			} 
+		};
+		function move(row, cell)
+		{
+        	webSocket.send(row + " " + cell);
+    	}
+    </script>
+</body>
+</html>
