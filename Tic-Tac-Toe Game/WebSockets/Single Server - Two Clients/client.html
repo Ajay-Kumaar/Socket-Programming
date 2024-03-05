@@ -6,14 +6,16 @@
     <title>Tic-Tac-Toe Game</title>
     <style>
 		body {
-			background: lightblue;
+			background: black;
 			text-align: center;
+			color: white;
 		}
         table {
-            border-collapse: collapse;
 			margin-left: auto;
 			margin-right: auto;
 			width: 10%;
+			border: 1px solid white;
+			border-spacing: 5px;
         }
         td {
 			cursor: pointer;
@@ -21,32 +23,34 @@
             height: 50px;
 			text-align: center;
 			font-size: 25px;
-            border: 2px dotted black;
+            border: 1px solid white;
         }
     </style>
 </head>
 <body>
-	<h1><u>Welcome to Tic-Tac-Toe Game</u></h1>
+	<h1>Welcome to Tic-Tac-Toe Game</h1>
 	<br>
     <h2>Your board:</h2>
 	<br>
     <table id="board">
         <tr>
-            <td onclick = "move(0,0)"></td>
-            <td onclick = "move(0,1)"></td>
-            <td onclick = "move(0,2)"></td>
+            <td onclick = "move(0, 0)"></td>
+            <td onclick = "move(0, 1)"></td>
+            <td onclick = "move(0, 2)"></td>
         </tr>
         <tr>
-            <td onclick = "move(1,0)"></td>
-            <td onclick = "move(1,1)"></td>
-            <td onclick = "move(1,2)"></td>
+            <td onclick = "move(1, 0)"></td>
+            <td onclick = "move(1, 1)"></td>
+            <td onclick = "move(1, 2)"></td>
         </tr>
         <tr>
-            <td onclick = "move(2,0)"></td>
-            <td onclick = "move(2,1)"></td>
-            <td onclick = "move(2,2)"></td>
+            <td onclick = "move(2, 0)"></td>
+            <td onclick = "move(2, 1)"></td>
+            <td onclick = "move(2, 2)"></td>
         </tr>
     </table>
+	<br>
+	<h2 id="message"></h2>
     <script>
         const webSocket = new WebSocket("ws://localhost:8000");
         webSocket.onopen = function(event) {
@@ -57,8 +61,13 @@
 			if (event.data.includes(","))
 			{
 				let [row, cell, symbol] = event.data.split(",");
-				document.getElementById("board").rows[row].cells[cell].innerText = symbol;
-			} 
+				var x = document.getElementById("board").rows[row].cells;
+				x[cell].style.backgroundColor = "white";
+				x[cell].style.color = "black";
+				x[cell].innerHTML = symbol;
+			}
+			else if (event.data.includes("won") || event.data.includes("lost") || event.data.includes("draw") || event.data.includes("progress"))
+				document.getElementById("message").innerHTML = event.data;
 		};
 		function move(row, cell)
 		{
