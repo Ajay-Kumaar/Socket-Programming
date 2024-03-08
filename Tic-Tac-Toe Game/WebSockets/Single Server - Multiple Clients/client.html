@@ -4,47 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tic-Tac-Toe Game</title>
-    <style>
-		#active_players_list {
-			display: none;
-		}
-		#player_id_button {
-			width: 100px; 
-			height: 25px;
-		}
-		#player_id_button:hover {
-			background-color: tomato;
-		}
-		#game_request {
-			display: none;
-		}
-		#board_section {
-			//display: none;		
-		}
-		#board {
-			//pointer-events: none;
-		}
-		body {
-			background: black;
-			text-align: center;
-			color: white;
-		}
-        table {
-			margin-left: auto;
-			margin-right: auto;
-			width: 10%;
-			border: 1px solid white;
-			border-spacing: 5px;
-        }
-        td {
-			cursor: pointer;
-            width: 50px;
-            height: 50px;
-			text-align: center;
-			font-size: 25px;
-            border: 1px solid white;
-        }
-    </style>
+    <link rel="stylesheet" href="styles.css">
+	<script src="script.js"></script>
 </head>
 <body>
 	<h1>Welcome to Tic-Tac-Toe Game</h1>
@@ -54,7 +15,9 @@
 	<div id="info_section">
 		<p id="active_players_list"></p>
 		<br>
-		<p id="game_request"></p>
+		<p id="game_request_sent_list"></p>
+		<br>
+		<p id="game_requests_list"></p>
 	</div>
 	<br>
 	<div id="board_section">
@@ -62,97 +25,25 @@
 		<br>
 		<table id="board">
 		    <tr>
-		        <td onclick = "move(0, 0)">-</td>
-		        <td onclick = "move(0, 1)">-</td>
-		        <td onclick = "move(0, 2)">-</td>
+		        <td onclick = "move(0,0)">-</td>
+		        <td onclick = "move(0,1)">-</td>
+		        <td onclick = "move(0,2)">-</td>
 		    </tr>
 		    <tr>
-		        <td onclick = "move(1, 0)">-</td>
-		        <td onclick = "move(1, 1)">-</td>
-		        <td onclick = "move(1, 2)">-</td>
+		        <td onclick = "move(1,0)">-</td>
+		        <td onclick = "move(1,1)">-</td>
+		        <td onclick = "move(1,2)">-</td>
 		    </tr>
 		    <tr>
-		        <td onclick = "move(2, 0)">-</td>
-		        <td onclick = "move(2, 1)">-</td>
-		        <td onclick = "move(2, 2)">-</td>
+		        <td onclick = "move(2,0)">-</td>
+		        <td onclick = "move(2,1)">-</td>
+		        <td onclick = "move(2,2)">-</td>
 		    </tr>
 		</table>
 		<br>
 		<h2 id="game_state"></h2>
+		<br>
+		<button id="new_game_req" onclick="new_game()">New Game</button>
 	</div>
-    <script>
-        const webSocket = new WebSocket("ws://localhost:8000");
-        webSocket.onopen = function(event) {
-            console.log("Player successfully connected to the Tic-Tac-Toe Server.");
-        };
-		webSocket.onclose = function (event) {
-            console.log("Player disconnected from the Tic-Tac-Toe Server.");
-        };
-		webSocket.onerror = function (event) {
-            console.error("WebSocket error! ", event);
-        };
-        webSocket.onmessage = function(event) {
-			console.log("\nReceived message from the Server: ", event.data);
-			if (event.data.includes("Player"))
-			{
-				document.getElementById("player_id").innerHTML = event.data;
-				document.getElementById("info_section").style.display = "initial";
-			}
-			if (event.data.includes("active_players"))
-			{
-				let active_players_list = event.data.split(" ");
-				let list_of_players = "List of active players. Click to send game request to the player<br><br>"; 
-				for(let i = 1; i < active_players_list.length-1; i++)
-				{
-					let opp_id = active_players_list[i];
-					list_of_players += "<button id='player_id_button' onclick='send_game_request(" + opp_id + ")'>" + active_players_list[i] + "</button><br>";
-				}
-				document.getElementById("active_players_list").style.display = "initial";
-				document.getElementById("active_players_list").innerHTML = list_of_players;
-			}
-			if (event.data.includes("no_active_players"))
-			{
-				document.getElementById("active_players_list").style.display = "initial";
-				document.getElementById("active_players_list").innerHTML = "Currently there are no active players.";
-			}
-			if (event.data.includes("Game request from playerID"))
-			{
-				document.getElementById("game_request").style.display = "initial";
-				document.getElementById("game_request").innerHTML = event.data;
-			}
-		};
-		function move(row, cell)
-		{
-        	webSocket.send(row + " " + cell);
-    	}
-		function send_game_request(opp_id)
-		{
-        	webSocket.send("game_request " + opp_id);
-    	}
-    </script>
 </body>
 </html>
-
-
-<!--
-			if (event.data.includes("Your turn"))
-			{
-				document.getElementById("game_state").innerHTML = event.data;
-				document.getElementById("board").style.pointerEvents = "auto";
-			}
-			else if (event.data.includes("Opponent's turn"))
-			{
-				document.getElementById("game_state").innerHTML = event.data;
-				document.getElementById("board").style.pointerEvents = "none";
-			}
-			if (event.data.includes(","))
-			{
-				let [row, cell, symbol] = event.data.split(",");
-				var x = document.getElementById("board").rows[row].cells;
-				x[cell].style.backgroundColor = "white";
-				x[cell].style.color = "black";
-				x[cell].innerHTML = symbol;
-			}
-			else if (event.data.includes("won") || event.data.includes("lost") || event.data.includes("draw"))
-				document.getElementById("game_state").innerHTML = event.data;
--->

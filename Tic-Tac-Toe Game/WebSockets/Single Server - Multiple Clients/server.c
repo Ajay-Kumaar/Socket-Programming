@@ -10,7 +10,7 @@
 #include <openssl/buffer.h>
 
 #define PORT 8000
-#define MAX_CLIENTS 10
+#define MAX_CLIENTS 20
 #define MAX_BUFFER_SIZE 1024
 
 int n = 0;
@@ -22,6 +22,7 @@ typedef struct
 	int socket;
 	int opp_id;
 	int is_available;
+	int game_requests[MAX_CLIENTS-1];
     char symbol;
 	char board[3][3];
 }Player;
@@ -59,40 +60,6 @@ void display_board(char board[3][3])
     printf("\n");
 }
 
-int is_game_over(char board[3][3], char symbol)
-{
-	if ((board[0][0] == symbol && board[1][1] == symbol && board[2][2] == symbol) ||
-        (board[0][2] == symbol && board[1][1] == symbol && board[2][0] == symbol))
-        return 1;
-    for (int i = 0; i < 3; i++)
-	{
-        if ((board[i][0] == symbol && board[i][1] == symbol && board[i][2] == symbol) ||
-            (board[0][i] == symbol && board[1][i] == symbol && board[2][i] == symbol))
-            return 1;
-    }
-    return 0;
-}
-
-int is_draw(char board[3][3])
-{
-	for(int i = 0; i < 3; i++)
-	{
-		for(int j = 0; j < 3; j++)
-			if(board[i][j] == ' ')
-				return 0;
-	}
-	return 1;
-}
-
-int is_valid_move(char board[3][3], int row, int col)
-{
-	if (row<0 || row>2 || col<0 || col>2)
-		return 0;
-    else if (board[row][col] == ' ')
-    	return 1;
-    return 0;
-}
-
 void encode_and_send(const char* str, int length, int client_socket) 
 {
     char frame[MAX_BUFFER_SIZE];
@@ -105,6 +72,55 @@ void encode_and_send(const char* str, int length, int client_socket)
     for (int i = 0; i < length; i++) 
         frame[i+6] = str[i] ^ mask_key[i%4];
     send(client_socket, frame, length + 6, 0);
+}
+
+char is_game_over(char board[3][3], char symbol, int id)
+{
+	char winning_moves[MAX_BUFFER_SIZE];
+	bzero(winning_moves, sizeof(winning_moves));
+	if ((board[0][0] == symbol && board[1][1] == symbol && board[2][2] == symbol))
+	{
+		snprintf(winning_moves, sizeof(winning_moves), "%d-%d-%d", 0, 4, 8);
+		encode_and_send(winning_moves, strlen(winning_moves), player[id].socket);
+		encode_and_send(winning_moves, strlen(winning_moves), player[player[id].opp_id].socket);
+        return symbol;
+	}
+	else if ((board[0][2] == symbol && board[1][1] == symbol && board[2][0] == symbol))
+	{
+		snprintf(winning_moves, sizeof(winning_moves), "%d-%d-%d", 2, 4, 6);
+		encode_and_send(winning_moves, strlen(winning_moves), player[id].socket);
+		encode_and_send(winning_moves, strlen(winning_moves), player[player[id].opp_id].socket);
+        return symbol;
+	}
+    for (int i = 0; i < 3; i++)
+	{
+        if ((board[i][0] == symbol && board[i][1] == symbol && board[i][2] == symbol))
+		{
+			snprintf(winning_moves, sizeof(winning_moves), "%d-%d-%d", ((3*i)+(0)), ((3*i)+(1)), ((3*i)+(2)));
+			encode_and_send(winning_moves, strlen(winning_moves), player[id].socket);
+			encode_and_send(winning_moves, strlen(winning_moves), player[player[id].opp_id].socket);
+            return symbol;
+		}
+		else if ((board[0][i] == symbol && board[1][i] == symbol && board[2][i] == symbol))
+		{
+			snprintf(winning_moves, sizeof(winning_moves), "%d-%d-%d", ((3*0)+(i)), ((3*1)+(i)), ((3*2)+(i)));
+			encode_and_send(winning_moves, strlen(winning_moves), player[id].socket);
+			encode_and_send(winning_moves, strlen(winning_moves), player[player[id].opp_id].socket);
+            return symbol;
+		}
+    }
+    return '-';
+}
+
+int is_draw(char board[3][3])
+{
+	for(int i = 0; i < 3; i++)
+	{
+		for(int j = 0; j < 3; j++)
+			if(board[i][j] == ' ')
+				return 0;
+	}
+	return 1;
 }
 
 int parse_web_socket_frame(char* str, int length, char* output)
@@ -158,8 +174,9 @@ void send_active_players()
 
 int main()
 {
-    int server_socket, max_socket, activity, player_socket, yes = 1, move, row, col, count, payload_length; 
+    int server_socket, max_socket, activity, player_socket, yes = 1, move, row, col, count, payload_length, index = 0; 
 	ssize_t bytes_received;
+	char win_symbol;
 	char buffer[MAX_BUFFER_SIZE];
 	char message[MAX_BUFFER_SIZE];
 	fd_set readfds;
@@ -229,6 +246,8 @@ int main()
 						player[i].socket = client_socket;
 						player[i].is_available = 1;
 						client_sockets[i] = client_socket;
+						for(int j = 0; j < MAX_CLIENTS-1; j++)
+							player[i].game_requests[j] = -1;
 						break;
 					}
 				}
@@ -268,11 +287,10 @@ int main()
 				bzero(message, sizeof(message));
 				snprintf(message, sizeof(message), "Player %d", n);
 				encode_and_send(message, strlen(message), client_socket);
-			
 			}
         }
 
-		send_active_players();
+		send_active_players(); //
 
         for (int i = 0; i < MAX_CLIENTS; i++)
 		{
@@ -287,7 +305,7 @@ int main()
                     close(player_socket);
                     client_sockets[i] = 0;
 					player[i].socket = 0;
-					send_active_players();
+					send_active_players(); //
                 }
 				else
 				{
@@ -301,14 +319,27 @@ int main()
 							char* ptr = strstr(message, " ");
 							ptr+=1;
 							int opp = atoi(ptr);
-							bzero(message, sizeof(message));
-							sprintf(message, "Game request from playerID %d.", i);
-							encode_and_send(message, strlen(message), client_sockets[opp]);
-							bzero(message, sizeof(message));
+							int already_requested = 0;
+							for(int j = 0; j < MAX_CLIENTS-1; j++)
+							{
+								if(player[opp].game_requests[j] == i)
+								{
+									already_requested = 1;
+									break;
+								}
+							}
+							if(already_requested == 0)
+							{
+								player[opp].game_requests[index++] = i;
+								bzero(message, sizeof(message));
+								sprintf(message, "Game request from playerID %d", i);
+								encode_and_send(message, strlen(message), client_sockets[opp]);
+								bzero(message, sizeof(message));
+							}
 						}
-						else if (strstr(buffer, "accept_request") != NULL)
+						else if (strstr(message, "accept_request") != NULL)
 						{
-							char* ptr = strstr(buffer, " ");
+							char* ptr = strstr(message, " ");
 							ptr+=1;
 							int curr = atoi(ptr);
 							int opp =  i;
@@ -318,75 +349,143 @@ int main()
 							player[opp].opp_id = curr;
 							player[curr].is_available = 0;
 							player[opp].is_available = 0;
+							send_active_players(); //
 							bzero(message, sizeof(message));
-							sprintf(message, "\nGame request accepted.\n");
-							strcat(message, "Your symbol: ");
-							char* s1 = &player[curr].symbol;
-							strcat(message, s1);
-							strcat(message, "\nYour turn.");
-							send(player[curr].socket, message, sizeof(message), 0);
+							sprintf(message, "Game request accepted");
+							encode_and_send(message, strlen(message), player[curr].socket);
 							bzero(message, sizeof(message));
-							sprintf(message, "\nYour symbol: ");
-							char* s2 = &player[opp].symbol;
-							strcat(message, s2);
-							strcat(message, "\nOpponent\'s turn. Please wait for some time...\n\n");
-							send(player[opp].socket, message, sizeof(message), 0);
+							sprintf(message, "Game request accepted");
+							encode_and_send(message, strlen(message), player[opp].socket);
+							bzero(message, sizeof(message));
+							sprintf(message, "Symbol %c", player[curr].symbol);
+							encode_and_send(message, strlen(message), player[curr].socket);
+							bzero(message, sizeof(message));
+							sprintf(message, "Symbol %c", player[opp].symbol);
+							encode_and_send(message, strlen(message), player[opp].socket);
+							bzero(message, sizeof(message));
+							sprintf(message, "Your turn");
+							encode_and_send(message, strlen(message), player[curr].socket);
+							bzero(message, sizeof(message));
+							sprintf(message, "Opponent's turn");
+							encode_and_send(message, strlen(message), player[opp].socket);
 							initialize_board(player[curr].board);
 							initialize_board(player[opp].board);
 							bzero(message, sizeof(message));
 						}
-						else if (strstr(buffer, "move ") != NULL)
+						else if(strstr(message, "current") != NULL)
 						{
-							char* ptr = strstr(buffer, " ");
-							ptr+=1;
-							move = atoi(ptr);
-							row = move/3;
-							col = move%3;
-							if (is_valid_move(player[i].board, row, col))
+							/*for(int j = 0; j < MAX_CLIENTS; j++)
 							{
-								player[i].board[row][col] = player[i].symbol;
-								player[player[i].opp_id].board[row][col] = player[i].symbol;
-								if (is_game_over(player[i].board, player[i].symbol))
+								bzero(message, sizeof(message));
+								sprintf(message, "current_list_of_player_requests ");
+								for (int k = 0; k < MAX_CLIENTS; k++)
 								{
-									bzero(message, sizeof(message));
-									sprintf(message, "winning_move %d %c", move, player[i].symbol);
-									send(player[i].socket, message, sizeof(message), 0);
-									send(player[player[i].opp_id].socket, message, sizeof(message), 0);
-
-									bzero(message, sizeof(message));
-									sprintf(message, "\n\nCongrats %c! You have won the match.\n\n", player[i].symbol);
-									send(player[i].socket, message, sizeof(message), 0);
-									bzero(message, sizeof(message));
-									sprintf(message, "\n\nSorry %c, you have lost the match. Better luck next time!\n\n", player[player[i].opp_id].symbol);
-									send(player[player[i].opp_id].socket, message, sizeof(message), 0);
-									bzero(message, sizeof(message));
+									if (k == j)
+										continue;
+									if (player[k].is_available == 1 && player[k].socket != 0)
+									{
+										char ch = k + '0';
+										char* chr = &ch;
+										*(chr+1) = '\0';
+										strcat(message, chr);
+										strcat(message, " ");
+									}
 								}
-								else if (is_draw(player[i].board))
-								{
-									bzero(message, sizeof(message));
-									sprintf(message, "draw_move %d %c", move, player[i].symbol);
-									send(player[i].socket, message, sizeof(message), 0);
-									send(player[player[i].opp_id].socket, message, sizeof(message), 0);
-		
-									send(player[i].socket, "\n\nGame has ended in draw.\n\n", sizeof("\n\nGame has ended in draw.\n\n"), 0);
-									send(player[player[i].opp_id].socket, "\n\nGame has ended in draw.\n\n", sizeof("\n\nGame has ended in draw.\n\n"), 0);
-									bzero(message, sizeof(message));
-								}
-								else
-								{			
-									send(player[i].socket, "Valid move. It\'s your opponent\'s turn.\n", sizeof("Valid move.It\'s your opponent\'s turn.\n"), 0);
-									bzero(message, sizeof(message));
-									sprintf(message, "\nOpponent\'s move was: %d. Now it\'s your turn.", move);
-									send(player[player[i].opp_id].socket, message, sizeof(message), 0);
-									bzero(message, sizeof(message));
-								}
-							}
-							else
+								encode_and_send(message, strlen(message), client_sockets[j]);	
+							}*/
+							char* message_copy;
+							strcpy(message_copy, message);
+							char* current_list[MAX_CLIENTS-1];
+							char* str = &message[8];
+							for(int j = 8; j < strlen(message); j++)
 							{
-								send(player[i].socket, "Invalid move.\n", sizeof("Invalid move.\n"), 0);
+								if(message_copy[j] == ' ')
+								{
+									*str
+								}
+								str += 1;
 							}
 						}
+						else if (strstr(message, " move") != NULL)
+						{
+                			sscanf(message, "%d %d", &row, &col);
+							if(row >= 0 && row < 3 && col >= 0 && col < 3 && player[i].board[row][col] == ' ')
+							{
+						        player[i].board[row][col] = player[i].symbol;
+								player[player[i].opp_id].board[row][col] = player[i].symbol;
+								bzero(message, sizeof(message));
+								snprintf(message, sizeof(message), "%d,%d,%c", row, col, player[i].board[row][col]);
+								encode_and_send(message, strlen(message), player[i].socket);
+								encode_and_send(message, strlen(message), player[player[i].opp_id].socket);
+						        if ((win_symbol = is_game_over(player[i].board, player[i].symbol, player[i].id)) == player[i].symbol)
+								{
+						            char* str1 = "You won the game!";
+									encode_and_send(str1, strlen(str1), player[i].socket);
+									char* str2 = "You lost the game. Better luck next time!";
+						            encode_and_send(str2, strlen(str2), player[player[i].opp_id].socket);
+									printf("\nPlayer %d disconnected from the game...\n", player[i].id);
+									printf("\nPlayer %d disconnected from the game...\n", player[i].opp_id);
+								    close(player[i].socket);
+									close(player[player[i].opp_id].socket);
+								    client_sockets[player[i].id] = 0;
+									client_sockets[player[i].opp_id] = 0;
+									player[i].socket = 0;
+									player[player[i].opp_id].socket = 0;
+									send_active_players();
+									break;
+								}
+								else if (win_symbol == player[player[i].opp_id].symbol)
+								{
+						            char* str1 = "You won the game!";
+									encode_and_send(str1, strlen(str1), player[player[i].opp_id].socket);
+									char* str2 = "You lost the game. Better luck next time!";
+						            encode_and_send(str2, strlen(str2), player[i].socket);
+									printf("\nPlayer %d disconnected from the game...\n", player[i].id);
+									printf("\nPlayer %d disconnected from the game...\n", player[i].opp_id);
+								    close(player[i].socket);
+									close(player[player[i].opp_id].socket);
+								    client_sockets[player[i].id] = 0;
+									client_sockets[player[i].opp_id] = 0;
+									player[i].socket = 0;
+									player[player[i].opp_id].socket = 0;
+									send_active_players();
+						            break;
+						        }
+								else if (is_draw(player[i].board))
+								{
+						            char* str = "It's a draw!";
+						            encode_and_send(str, strlen(str), player[i].socket);
+									encode_and_send(str, strlen(str), player[player[i].opp_id].socket);
+									printf("\nPlayer %d disconnected from the game...\n", player[i].id);
+									printf("\nPlayer %d disconnected from the game...\n", player[i].opp_id);
+								    close(player[i].socket);
+									close(player[player[i].opp_id].socket);
+								    client_sockets[player[i].id] = 0;
+									client_sockets[player[i].opp_id] = 0;
+									player[i].socket = 0;
+									player[player[i].opp_id].socket = 0;
+									send_active_players();
+						            break;
+						        }
+								else
+								{
+									char* str = "Game in progress.";
+						            encode_and_send(str, strlen(str), player[i].socket);
+									encode_and_send(str, strlen(str), player[player[i].opp_id].socket);
+									bzero(message, sizeof(message));
+									snprintf(message, sizeof(message), "Your turn");
+									encode_and_send(message, strlen(message), player[player[i].opp_id].socket);
+									bzero(message, sizeof(message));
+									snprintf(message, sizeof(message), "Opponent's turn");
+									encode_and_send(message, strlen(message), player[i].socket);
+								}
+						    }
+							else
+						        printf("\n\nInvalid move from the player %d", i);
+						}
 					}
+					else
+                		printf("\n\nInvalid WebSocket frame received from the player %d", i);
                 }
             }
         }

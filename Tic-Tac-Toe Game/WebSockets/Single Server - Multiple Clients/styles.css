@@ -1,0 +1,41 @@
+#active_players_list {
+	display: none;
+}
+#player_id_button {
+	cursor: pointer;
+	width: 100px; 
+	height: 25px;
+}
+#player_id_button:hover {
+	background-color: tomato;
+}
+#game_requests_list {
+	display: none;
+}
+#board_section {
+	display: none;		
+}
+#board {
+	pointer-events: none;
+}
+
+body {
+	background: black;
+	text-align: center;
+	color: white;
+}
+table {
+	margin-left: auto;
+	margin-right: auto;
+	width: 10%;
+	border: 1px solid white;
+	border-spacing: 5px;
+}
+td {
+	cursor: pointer;
+	width: 50px;
+	height: 50px;
+	text-align: center;
+	font-size: 25px;
+	border: 1px solid white;
+}
