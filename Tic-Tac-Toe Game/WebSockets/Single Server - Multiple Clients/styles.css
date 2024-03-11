@@ -7,7 +7,7 @@
 	height: 25px;
 }
 #player_id_button:hover {
-	background-color: tomato;
+	background-color: DodgerBlue;
 }
 #game_requests_list {
 	display: none;
@@ -19,16 +19,19 @@
 	pointer-events: none;
 }
 
+h1 {
+	color:white;
+}
 body {
 	background: black;
 	text-align: center;
-	color: white;
+	color: DodgerBlue;
 }
 table {
 	margin-left: auto;
 	margin-right: auto;
 	width: 10%;
-	border: 1px solid white;
+	border: 2px solid white;
 	border-spacing: 5px;
 }
 td {
@@ -37,5 +40,6 @@ td {
 	height: 50px;
 	text-align: center;
 	font-size: 25px;
-	border: 1px solid white;
+	border: 2px solid white;
+	color: white;
 }

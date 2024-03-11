@@ -8,21 +8,20 @@
 	<script src="script.js"></script>
 </head>
 <body>
-	<h1>Welcome to Tic-Tac-Toe Game</h1>
+	<h1 id="battle_message">Welcome to Tic-Tac-Toe Game</h1>
 	<br>
 	<h2 id="player_id"></h2>
+	<h2 id="player_symbol"></h2>
 	<br>
-	<div id="info_section">
+	<div id="game_request_section">
 		<p id="active_players_list"></p>
 		<br>
-		<p id="game_request_sent_list"></p>
+		<p id="game_requests_sent_list" style="color:white"></p>
 		<br>
-		<p id="game_requests_list"></p>
+		<p id="game_requests_received_list"></p>
 	</div>
 	<br>
 	<div id="board_section">
-		<h2>Your board</h2>
-		<br>
 		<table id="board">
 		    <tr>
 		        <td onclick = "move(0,0)">-</td>
@@ -41,9 +40,8 @@
 		    </tr>
 		</table>
 		<br>
-		<h2 id="game_state"></h2>
+		<h2 id="game_status"></h2>
 		<br>
-		<button id="new_game_req" onclick="new_game()">New Game</button>
 	</div>
 </body>
 </html>
